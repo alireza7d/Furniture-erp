@@ -41,6 +41,8 @@ def stock_levels(warehouse_id: int = None, db: Session = Depends(get_db)):
             "sku": p.sku,
             "category": p.category,
             "on_hand": on_hand,
+            "cost_price": p.cost_price,
+            "sale_price": p.sale_price,
             "cost_value": round(on_hand * p.cost_price, 2),
         })
     return result

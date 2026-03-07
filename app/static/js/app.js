@@ -566,12 +566,15 @@ async function renderInventory(el) {
             '<div class="stat-card info"><div class="stat-label">Warehouses</div><div class="stat-value">' + fmtN(dash.warehouses) + '</div></div>' +
         '</div>' +
         '<div class="card"><div class="card-header">Stock Levels</div><div class="table-wrapper"><table><thead><tr>' +
-            '<th>SKU</th><th>Product</th><th>Category</th><th>On Hand</th><th>Value</th>' +
+            '<th>SKU</th><th>Product</th><th>Category</th><th>Cost Price</th><th>Sale Price</th><th>On Hand</th><th>Value</th><th>Actions</th>' +
         '</tr></thead><tbody>' +
         stock.map(s => '<tr><td>' + escHtml(s.sku || '') + '</td><td><strong>' + escHtml(s.product_name) + '</strong></td>' +
             '<td>' + escHtml(s.category || '') + '</td>' +
+            '<td>' + fmt(s.cost_price) + '</td>' +
+            '<td>' + fmt(s.sale_price) + '</td>' +
             '<td><span style="color:' + (s.on_hand <= 5 ? 'var(--danger)' : 'var(--success)') + ';font-weight:600;">' + s.on_hand + '</span></td>' +
-            '<td>' + fmt(s.cost_value) + '</td></tr>'
+            '<td>' + fmt(s.cost_value) + '</td>' +
+            '<td><button class="btn btn-outline btn-sm" onclick="editProduct(' + s.product_id + ')">Edit</button></td></tr>'
         ).join('') +
         '</tbody></table></div></div>';
 }
@@ -601,6 +604,48 @@ async function saveStockMove() {
         data.warehouse_id = 1;
         await api('/api/inventory/moves', { method: 'POST', body: data });
         closeModal(); toast('Stock updated'); navigate('inventory');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+const CATEGORIES = ['Sofa','Table','Chair','Bed','Cabinet','Shelf','Desk','Outdoor','Accessory','Raw Material'];
+
+async function editProduct(id) {
+    const p = await api('/api/products/' + id);
+    const catOpts = CATEGORIES.map(c => '<option value="' + c + '"' + (c === p.category ? ' selected' : '') + '>' + c + '</option>').join('');
+    openModal('Edit Product',
+        '<form id="edit-product-form">' +
+        '<div class="form-group"><label>Name</label><input name="name" class="form-control" value="' + escHtml(p.name) + '"></div>' +
+        '<div class="form-row">' +
+            '<div class="form-group"><label>SKU</label><input name="sku" class="form-control" value="' + escHtml(p.sku || '') + '"></div>' +
+            '<div class="form-group"><label>Category</label><select name="category" class="form-control">' + catOpts + '</select></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+            '<div class="form-group"><label>Cost Price</label><input name="cost_price" type="number" step="0.001" class="form-control" value="' + (p.cost_price || 0) + '"></div>' +
+            '<div class="form-group"><label>Sale Price</label><input name="sale_price" type="number" step="0.001" class="form-control" value="' + (p.sale_price || 0) + '"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+            '<div class="form-group"><label>Weight (kg)</label><input name="weight" type="number" step="0.01" class="form-control" value="' + (p.weight || 0) + '"></div>' +
+            '<div class="form-group"><label>Dimensions</label><input name="dimensions" class="form-control" value="' + escHtml(p.dimensions || '') + '" placeholder="e.g. 120x80x75 cm"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+            '<div class="form-group"><label>Material</label><input name="material" class="form-control" value="' + escHtml(p.material || '') + '"></div>' +
+            '<div class="form-group"><label>Color</label><input name="color" class="form-control" value="' + escHtml(p.color || '') + '"></div>' +
+        '</div>' +
+        '<div class="form-group"><label>Description</label><textarea name="description" class="form-control">' + escHtml(p.description || '') + '</textarea></div>' +
+        '</form>',
+        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
+        '<button class="btn btn-primary" onclick="saveProduct(' + id + ')">Save</button>'
+    );
+}
+
+async function saveProduct(id) {
+    try {
+        const data = getFormData('edit-product-form');
+        data.cost_price = parseFloat(data.cost_price) || 0;
+        data.sale_price = parseFloat(data.sale_price) || 0;
+        data.weight = parseFloat(data.weight) || 0;
+        await api('/api/products/' + id, { method: 'PUT', body: data });
+        closeModal(); toast('Product updated'); navigate('inventory');
     } catch (e) { toast(e.message, 'error'); }
 }
 
