@@ -343,7 +343,7 @@ async function renderPOS(el) {
         '<div class="pos-layout">' +
             '<div><div style="margin-bottom:12px;"><input type="text" class="form-control" placeholder="Search products..." oninput="filterPOSProducts(this.value)"></div>' +
             '<div class="pos-products-grid" id="pos-grid">' +
-            products.map(p => '<div class="pos-product-card" data-name="' + escHtml(p.name).toLowerCase() + '" onclick="addToCart(' + p.id + ','' + escHtml(p.name).replace(/'/g, '') + '',' + p.sale_price + ')">' +
+            products.map(p => '<div class="pos-product-card" data-name="' + escHtml(p.name).toLowerCase() + '" onclick="addToCart(' + p.id + ',&apos;' + escHtml(p.name).replace(/'/g, '') + '&apos;,' + p.sale_price + ')">' +
                 '<div class="pos-product-icon">' + (categoryIcons[p.category] || '&#9642;') + '</div>' +
                 '<div class="pos-product-name">' + escHtml(p.name) + '</div>' +
                 '<div class="pos-product-price">' + fmt(p.sale_price) + '</div>' +
@@ -359,8 +359,8 @@ async function renderPOS(el) {
                         '<div class="pos-totals-row total"><span>Total</span><span id="pos-total">' + fmt(0) + '</span></div>' +
                     '</div>' +
                     '<div class="pos-payment-buttons">' +
-                        '<button class="btn btn-success" onclick="completePOSOrder('cash')">Cash</button>' +
-                        '<button class="btn btn-primary" onclick="completePOSOrder('card')">Card</button>' +
+                        '<button class="btn btn-success" onclick="completePOSOrder(&apos;cash&apos;)">Cash</button>' +
+                        '<button class="btn btn-primary" onclick="completePOSOrder(&apos;card&apos;)">Card</button>' +
                     '</div>' +
                 '</div>' +
             '</div>' +
@@ -438,9 +438,9 @@ async function renderAccounting(el) {
             '<div class="stat-card danger"><div class="stat-label">Overdue</div><div class="stat-value">' + fmtN(dash.overdue_invoices) + '</div></div>' +
         '</div>' +
         '<div class="tabs">' +
-            '<div class="tab active" onclick="filterInvoices(this,'all')">All</div>' +
-            '<div class="tab" onclick="filterInvoices(this,'customer')">Customer Invoices</div>' +
-            '<div class="tab" onclick="filterInvoices(this,'vendor')">Vendor Bills</div>' +
+            '<div class="tab active" onclick="filterInvoices(this,&apos;all&apos;)">All</div>' +
+            '<div class="tab" onclick="filterInvoices(this,&apos;customer&apos;)">Customer Invoices</div>' +
+            '<div class="tab" onclick="filterInvoices(this,&apos;vendor&apos;)">Vendor Bills</div>' +
         '</div>' +
         '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
             '<th>Reference</th><th>Contact</th><th>Type</th><th>Date</th><th>Total</th><th>Paid</th><th>Status</th>' +
@@ -707,8 +707,8 @@ async function renderManufacturing(el) {
             '<div class="stat-card info"><div class="stat-label">Active BOMs</div><div class="stat-value">' + fmtN(dash.active_boms) + '</div></div>' +
         '</div>' +
         '<div class="tabs">' +
-            '<div class="tab active" onclick="showMfgTab(this,'orders')">Manufacturing Orders</div>' +
-            '<div class="tab" onclick="showMfgTab(this,'bom')">Bills of Materials</div>' +
+            '<div class="tab active" onclick="showMfgTab(this,&apos;orders&apos;)">Manufacturing Orders</div>' +
+            '<div class="tab" onclick="showMfgTab(this,&apos;bom&apos;)">Bills of Materials</div>' +
         '</div>' +
         '<div id="mfg-orders" class="card"><div class="table-wrapper"><table><thead><tr>' +
             '<th>Reference</th><th>Product</th><th>Qty</th><th>Status</th><th>Start</th><th>Actions</th>' +
@@ -844,8 +844,8 @@ async function renderEmailMarketing(el) {
             '<div class="stat-card info"><div class="stat-label">Click Rate</div><div class="stat-value">' + dash.email_click_rate + '%</div></div>' +
         '</div>' +
         '<div class="tabs">' +
-            '<div class="tab active" onclick="showEmailTab(this,'campaigns')">Campaigns</div>' +
-            '<div class="tab" onclick="showEmailTab(this,'lists')">Mailing Lists</div>' +
+            '<div class="tab active" onclick="showEmailTab(this,&apos;campaigns&apos;)">Campaigns</div>' +
+            '<div class="tab" onclick="showEmailTab(this,&apos;lists&apos;)">Mailing Lists</div>' +
         '</div>' +
         '<div id="email-campaigns" class="card"><div class="table-wrapper"><table><thead><tr>' +
             '<th>Name</th><th>Subject</th><th>List</th><th>Sent</th><th>Opened</th><th>Clicked</th><th>Status</th><th>Actions</th>' +
@@ -987,7 +987,7 @@ async function showNewSMSCampaign() {
         '<form id="sms-form">' +
         '<div class="form-group"><label>Campaign Name</label><input name="name" class="form-control" required></div>' +
         '<div class="form-group"><label>Mailing List</label><select name="mailing_list_id" class="form-control">' + opts + '</select></div>' +
-        '<div class="form-group"><label>Message</label><textarea name="message" class="form-control" rows="4" maxlength="160" oninput="document.getElementById('sms-count').textContent=this.value.length+'/160'"></textarea><div class="sms-char-count" id="sms-count">0/160</div></div>' +
+        '<div class="form-group"><label>Message</label><textarea name="message" class="form-control" rows="4" maxlength="160" oninput="document.getElementById(&apos;sms-count&apos;).textContent=this.value.length+&apos;/160&apos;"></textarea><div class="sms-char-count" id="sms-count">0/160</div></div>' +
         '</form>',
         '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
         '<button class="btn btn-primary" onclick="saveSMSCampaign()">Create</button>'
@@ -1017,9 +1017,9 @@ async function renderContacts(el) {
     el.innerHTML = '<div class="page-header"><h1 class="page-title">Contacts</h1>' +
         '<div class="page-actions"><button class="btn btn-primary" onclick="showNewContact()">+ New Contact</button></div></div>' +
         '<div class="tabs">' +
-            '<div class="tab active" onclick="filterContactsTab(this,'all')">All</div>' +
-            '<div class="tab" onclick="filterContactsTab(this,'customer')">Customers</div>' +
-            '<div class="tab" onclick="filterContactsTab(this,'vendor')">Vendors</div>' +
+            '<div class="tab active" onclick="filterContactsTab(this,&apos;all&apos;)">All</div>' +
+            '<div class="tab" onclick="filterContactsTab(this,&apos;customer&apos;)">Customers</div>' +
+            '<div class="tab" onclick="filterContactsTab(this,&apos;vendor&apos;)">Vendors</div>' +
         '</div>' +
         '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
             '<th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>City</th><th>Type</th>' +
@@ -1120,7 +1120,7 @@ async function renderProducts(el) {
     el.innerHTML = '<div class="page-header"><h1 class="page-title">Products</h1>' +
         '<div class="page-actions"><button class="btn btn-primary" onclick="showNewProduct()">+ New Product</button></div></div>' +
         '<div class="tabs">' +
-        categories.map((c, i) => '<div class="tab' + (i === 0 ? ' active' : '') + '" onclick="filterProducts(this,'' + c + '')">'+c+'</div>').join('') +
+        categories.map((c, i) => '<div class="tab' + (i === 0 ? ' active' : '') + '" onclick="filterProducts(this,&apos;' + c + '&apos;)">'+c+'</div>').join('') +
         '</div>' +
         '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
             '<th>SKU</th><th>Name</th><th>Category</th><th>Material</th><th>Sale Price</th><th>Cost</th><th>Dimensions</th>' +
