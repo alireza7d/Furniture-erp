@@ -1728,6 +1728,188 @@ select.form-control {
     padding-top: 4px;
 }
 
+/* ── Gauge Charts (Benchmark) ─────────────────────────────────────────────── */
+
+.db-gauge-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px 48px;
+}
+
+.db-gauge-card {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    gap: 0 20px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.db-gauge-title {
+    grid-column: 1 / -1;
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.db-gauge-wrap {
+    width: 140px;
+    text-align: center;
+}
+
+.db-gauge-svg {
+    width: 120px;
+    height: 70px;
+}
+
+.db-gauge-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: -4px;
+    padding: 0 10px;
+}
+
+.db-gauge-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    margin-top: 2px;
+}
+
+.db-gauge-desc {
+    padding-top: 12px;
+}
+
+.db-gauge-formula {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.db-gauge-bullet {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+/* ── Stacked Bar Charts ──────────────────────────────────────────────────── */
+
+.db-stacked-chart {
+    display: flex;
+    gap: 8px;
+    padding: 8px 0;
+}
+
+.db-stacked-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    flex: 1;
+    height: 220px;
+}
+
+.db-stacked-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+}
+
+.db-stacked-bar-stack {
+    width: 70%;
+    display: flex;
+    flex-direction: column;
+    border-radius: 2px 2px 0 0;
+    overflow: hidden;
+}
+
+.db-stacked-label {
+    font-size: 8px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    transform: rotate(-30deg);
+    transform-origin: top center;
+}
+
+.db-legend {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.db-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.db-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+}
+
+/* ── Combo Charts ────────────────────────────────────────────────────────── */
+
+.db-combo-chart {
+    display: flex;
+    gap: 8px;
+    padding: 8px 0;
+}
+
+.db-combo-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    flex: 1;
+    height: 220px;
+}
+
+.db-combo-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+}
+
+.db-combo-bar {
+    width: 60%;
+    border-radius: 2px 2px 0 0;
+}
+
+.db-combo-line-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 200px;
+    pointer-events: none;
+}
+
+.db-chart-y-right {
+    position: absolute;
+    right: -40px;
+    top: 0;
+    border-left: none !important;
+    text-align: left;
+}
+
 /* ── Misc ────────────────────────────────────────────────────────────────────── */
 
 .divider {

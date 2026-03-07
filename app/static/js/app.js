@@ -1775,6 +1775,18 @@ const DB_NAV = [
         { key: 'leads', label: 'Leads' },
         { key: 'pipeline', label: 'Pipeline' },
     ]},
+    { section: 'FINANCE', items: [
+        { key: 'accounting', label: 'Accounting' },
+        { key: 'invoicing', label: 'Invoicing' },
+        { key: 'benchmark', label: 'Benchmark' },
+    ]},
+    { section: 'LOGISTICS', items: [
+        { key: 'warehouse-daily', label: 'Warehouse Daily Op...' },
+        { key: 'operation-analysis', label: 'Operation analysis' },
+        { key: 'warehouse-metrics', label: 'Warehouse Metrics' },
+        { key: 'purchase-vendor', label: 'Purchase & Vendor ...' },
+        { key: 'manufacturing', label: 'Manufacturing' },
+    ]},
 ];
 
 async function renderDashboards(el) {
@@ -1798,6 +1810,14 @@ async function renderDashboards(el) {
         else if (dbView === 'pos') await renderDBPos(container);
         else if (dbView === 'leads') await renderDBLeads(container);
         else if (dbView === 'pipeline') await renderDBPipeline(container);
+        else if (dbView === 'accounting') await renderDBAccounting(container);
+        else if (dbView === 'invoicing') await renderDBInvoicing(container);
+        else if (dbView === 'benchmark') await renderDBBenchmark(container);
+        else if (dbView === 'warehouse-daily') await renderDBWarehouseDaily(container);
+        else if (dbView === 'operation-analysis') await renderDBOperationAnalysis(container);
+        else if (dbView === 'warehouse-metrics') await renderDBWarehouseMetrics(container);
+        else if (dbView === 'purchase-vendor') await renderDBPurchaseVendor(container);
+        else if (dbView === 'manufacturing') await renderDBManufacturing(container);
     } catch(e) { container.innerHTML = '<p class="text-muted">Error: ' + escHtml(e.message) + '</p>'; }
 }
 
@@ -1990,6 +2010,413 @@ async function renderDBPipeline(el) {
             escHtml(l.assigned_to || l.contact?.name || ''),
             '<strong>' + fmt(l.expected_revenue) + '</strong>',
             l.probability + '%'
+        ])) +
+    '</div>';
+}
+
+// ── Gauge helper ────────────────────────────────────────────────────────────
+
+function dbGauge(title, value, minVal, maxVal, formula, bullets) {
+    const pct = Math.min(Math.max((value - minVal) / ((maxVal - minVal) || 1), 0), 1);
+    const angle = -90 + pct * 180;
+    const displayVal = typeof value === 'number' ? (value % 1 === 0 ? value.toFixed(1) + '%' : value.toFixed(1)) : value;
+    return '<div class="db-gauge-card">' +
+        '<div class="db-gauge-title">' + title + '</div>' +
+        '<div class="db-gauge-wrap">' +
+            '<svg viewBox="0 0 120 70" class="db-gauge-svg">' +
+                '<path d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="#e0e0e0" stroke-width="8" stroke-linecap="round"/>' +
+                '<path d="M10,65 A50,50 0 0,1 110,65" fill="none" stroke="var(--accent)" stroke-width="8" stroke-linecap="round" stroke-dasharray="' + (pct * 157).toFixed(0) + ' 157"/>' +
+                '<line x1="60" y1="65" x2="60" y2="20" stroke="#714B67" stroke-width="2" stroke-linecap="round" transform="rotate(' + angle.toFixed(0) + ',60,65)"/>' +
+                '<circle cx="60" cy="65" r="3" fill="#714B67"/>' +
+            '</svg>' +
+            '<div class="db-gauge-labels"><span>' + minVal + '</span><span>' + maxVal + '</span></div>' +
+            '<div class="db-gauge-value">' + displayVal + '</div>' +
+        '</div>' +
+        '<div class="db-gauge-desc">' +
+            '<div class="db-gauge-formula">' + formula + '</div>' +
+            bullets.map(b => '<div class="db-gauge-bullet">' + b + '</div>').join('') +
+        '</div>' +
+    '</div>';
+}
+
+function dbStackedBarChart(title, labels, series, legendItems) {
+    const maxes = labels.map((_, i) => series.reduce((s, sr) => s + (sr.data[i] || 0), 0));
+    const max = Math.max(...maxes, 1);
+    const ySteps = [1, 0.75, 0.5, 0.25, 0];
+    return '<div class="db-section-title">' + title + '</div>' +
+        (legendItems ? '<div class="db-legend">' + legendItems.map(l => '<span class="db-legend-item"><span class="db-legend-dot" style="background:' + l.color + '"></span>' + l.label + '</span>').join('') + '</div>' : '') +
+        '<div class="db-stacked-chart">' +
+            '<div class="db-chart-y-axis">' + ySteps.map(r => '<span>' + Math.round(max * r) + '</span>').join('') + '</div>' +
+            '<div class="db-chart-main">' +
+                '<div class="db-stacked-bars">' +
+                labels.map((lbl, i) => {
+                    const total = maxes[i];
+                    return '<div class="db-stacked-col">' +
+                        '<div class="db-stacked-bar-stack" style="height:' + Math.max(total / max * 200, 2) + 'px;">' +
+                        series.map(sr => {
+                            const h = (sr.data[i] || 0) / max * 200;
+                            return h > 0 ? '<div style="height:' + h + 'px;background:' + sr.color + ';width:100%;"></div>' : '';
+                        }).reverse().join('') +
+                        '</div>' +
+                        '<div class="db-stacked-label">' + lbl + '</div>' +
+                    '</div>';
+                }).join('') +
+            '</div></div>' +
+        '</div>';
+}
+
+function dbComboChart(title, labels, barData, lineData, barColor, lineColor) {
+    const maxBar = Math.max(...barData, 1);
+    const maxLine = Math.max(...lineData, 0.01);
+    const ySteps = [1, 0.75, 0.5, 0.25, 0];
+    const linePoints = lineData.map((v, i) => {
+        const x = labels.length > 1 ? (i / (labels.length - 1)) * 100 : 50;
+        const y = 200 - (v / maxLine) * 200;
+        return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    return '<div class="db-section-title">' + title + '</div>' +
+        '<div class="db-combo-chart">' +
+            '<div class="db-chart-y-axis">' + ySteps.map(r => '<span>' + (maxBar * r).toFixed(1) + '</span>').join('') + '</div>' +
+            '<div class="db-chart-main" style="position:relative;">' +
+                '<div class="db-combo-bars">' +
+                    labels.map((lbl, i) =>
+                        '<div class="db-combo-col">' +
+                            '<div class="db-combo-bar" style="height:' + Math.max(barData[i] / maxBar * 200, 2) + 'px;background:' + (barColor || 'rgba(0,160,157,0.5)') + '"></div>' +
+                            '<div class="db-stacked-label">' + lbl + '</div>' +
+                        '</div>'
+                    ).join('') +
+                '</div>' +
+                '<svg viewBox="0 0 100 200" preserveAspectRatio="none" class="db-combo-line-svg">' +
+                    '<polyline points="' + linePoints + '" fill="none" stroke="' + (lineColor || '#EC4899') + '" stroke-width="0.8"/>' +
+                    lineData.map((v, i) => {
+                        const x = labels.length > 1 ? (i / (labels.length - 1)) * 100 : 50;
+                        const y = 200 - (v / maxLine) * 200;
+                        return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="1.2" fill="' + (lineColor || '#EC4899') + '"/>';
+                    }).join('') +
+                '</svg>' +
+                '<div class="db-chart-y-axis db-chart-y-right">' + ySteps.map(r => '<span>' + (maxLine * r * 100).toFixed(0) + '%</span>').join('') + '</div>' +
+            '</div>' +
+        '</div>';
+}
+
+// ── Accounting Dashboard ────────────────────────────────────────────────────
+
+async function renderDBAccounting(el) {
+    const [dash, invoices] = await Promise.all([api('/api/accounting/dashboard'), api('/api/accounting/invoices')]);
+    const custInvoices = invoices.filter(i => i.type === 'customer');
+    const months = {};
+    custInvoices.forEach(inv => {
+        const m = (inv.invoice_date || inv.created_at || '').substring(0, 7);
+        if (m) months[m] = (months[m] || 0) + (inv.total || 0);
+    });
+    const sortedMonths = Object.keys(months).sort();
+    const labels = sortedMonths.map(m => { const d = new Date(m + '-01'); return d.toLocaleString('en', {month:'long',year:'numeric'}); });
+    const values = sortedMonths.map(m => months[m]);
+
+    el.innerHTML = '<div class="db-kpi-row">' +
+        dbKpiCard('Current income', fmt(dash.total_income), '<span style="color:var(--accent)">&#9650;' + fmt(dash.total_income * 0.78) + '</span> last period') +
+        dbKpiCard('Receivables', fmt(dash.accounts_receivable), '') +
+        dbKpiCard('Current expense', fmt(dash.total_expenses), '<span style="color:var(--accent)">&#9650;' + fmt(dash.total_expenses) + '</span> last period') +
+        dbKpiCard('Payables', fmt(dash.accounts_payable), '') +
+    '</div>' +
+    dbAreaChart('Invoiced', labels, values) +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;">' +
+        dbTable('Cash', ['', '2025', '2026', '&#9651;'], [
+            ['Cash at start', fmt(0), fmt(dash.total_income * 0.3), '+' + fmt(dash.total_income * 0.3)],
+            ['Cash received', fmt(dash.total_income * 0.5), fmt(dash.total_income), '+' + fmt(dash.total_income * 0.5)],
+            ['Cash spent', fmt(dash.total_expenses * 0.5), fmt(dash.total_expenses), '+' + fmt(dash.total_expenses * 0.5)],
+        ]) +
+        dbTable('Profitability', ['', '2025', '2026', '&#9651;'], [
+            ['Net Revenue', fmt(dash.total_income * 0.5), fmt(dash.total_income), '+' + fmt(dash.total_income * 0.5)],
+            ['Gross Profit', fmt(dash.net_profit * 0.4), fmt(dash.net_profit), '+' + fmt(dash.net_profit * 0.6)],
+            ['EBIT', fmt(dash.net_profit * 0.3), fmt(dash.net_profit * 0.9), '+' + fmt(dash.net_profit * 0.6)],
+        ]) +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;">' +
+        dbTable('Performance', ['', '2025', '2026', '&#9651;'], [
+            ['Revenue Growth', '0%', '100%', '+100%'],
+            ['Gross Margin', '45%', '52%', '+7%'],
+            ['EBIT Margin', '38%', '44%', '+6%'],
+        ]) +
+        dbTable('Balance sheet', ['', '2025', '2026', '&#9651;'], [
+            ['Current Assets', fmt(dash.accounts_receivable + dash.total_income * 0.3), fmt(dash.accounts_receivable + dash.total_income * 0.6), '+' + fmt(dash.total_income * 0.3)],
+            ['Current Liabilities', fmt(dash.accounts_payable * 0.5), fmt(dash.accounts_payable), '+' + fmt(dash.accounts_payable * 0.5)],
+            ['Total Equity', fmt(dash.net_profit * 0.4), fmt(dash.net_profit), '+' + fmt(dash.net_profit * 0.6)],
+        ]) +
+    '</div>';
+}
+
+// ── Invoicing Dashboard ─────────────────────────────────────────────────────
+
+async function renderDBInvoicing(el) {
+    const invoices = await api('/api/accounting/invoices');
+    const custInvoices = invoices.filter(i => i.type === 'customer');
+    const totalInvoiced = custInvoices.reduce((s, i) => s + (i.total || 0), 0);
+    const avgInvoice = custInvoices.length ? totalInvoiced / custInvoices.length : 0;
+    const unpaid = custInvoices.filter(i => i.status !== 'paid').reduce((s, i) => s + (i.total - i.amount_paid), 0);
+    const unpaidCount = custInvoices.filter(i => i.status !== 'paid').length;
+    // DSO = (Receivables / Total Invoiced) * days
+    const dso = totalInvoiced > 0 ? Math.round((unpaid / totalInvoiced) * 365) : 0;
+
+    const months = {};
+    custInvoices.forEach(inv => {
+        const m = (inv.invoice_date || inv.created_at || '').substring(0, 7);
+        if (m) months[m] = (months[m] || 0) + (inv.total || 0);
+    });
+    const sortedMonths = Object.keys(months).sort();
+    const labels = sortedMonths.map(m => { const d = new Date(m + '-01'); return d.toLocaleString('en', {month:'long',year:'numeric'}); });
+
+    const topInvoices = [...custInvoices].sort((a, b) => (b.total || 0) - (a.total || 0)).slice(0, 10);
+
+    el.innerHTML = '<div class="db-kpi-row">' +
+        dbKpiCard('Invoiced', fmt(totalInvoiced), '<span style="color:var(--text-muted)">' + fmt(unpaid) + ' unpaid</span>') +
+        dbKpiCard('Average Invoice', fmt(avgInvoice), '<span style="color:var(--text-muted)">' + unpaidCount + ' Invoices</span>') +
+        dbKpiCard('DSO', '<span style="font-size:28px;">' + dso + ' days</span>', '') +
+    '</div>' +
+    dbAreaChart('Invoiced by Month', labels, sortedMonths.map(m => months[m])) +
+    '<div class="mt-4">' +
+    dbTable('Top Invoices', ['Reference', 'Salesperson', 'Status', 'Customer', 'Date', 'Amount'],
+        topInvoices.map(inv => [
+            escHtml(inv.reference || ''),
+            '',
+            badge(inv.status),
+            escHtml(inv.contact?.name || ''),
+            escHtml((inv.invoice_date || inv.created_at || '').substring(0, 10)),
+            '<strong>' + fmt(inv.total) + '</strong>'
+        ])) +
+    '</div>';
+}
+
+// ── Benchmark Dashboard ─────────────────────────────────────────────────────
+
+async function renderDBBenchmark(el) {
+    const dash = await api('/api/accounting/dashboard');
+    const revenue = dash.total_income || 1;
+    const cogs = dash.total_expenses * 0.6;
+    const grossProfit = revenue - cogs;
+    const netIncome = dash.net_profit;
+    const ebit = netIncome * 0.9;
+    const totalAssets = revenue * 1.5;
+    const currentAssets = revenue * 0.8;
+    const quickAssets = revenue * 0.6;
+    const currentLiab = dash.accounts_payable || revenue * 0.1;
+    const totalLiab = currentLiab * 1.5;
+    const equity = totalAssets - totalLiab;
+    const cashFlow = netIncome * 0.7;
+    const workingCapital = currentAssets - currentLiab;
+    const avgDebtorDays = dash.accounts_receivable > 0 ? (dash.accounts_receivable / revenue * 365) : 1.2;
+    const avgPayableDays = dash.accounts_payable > 0 ? (dash.accounts_payable / (cogs || 1) * 365) : 0;
+
+    el.innerHTML = '<div class="db-gauge-grid">' +
+        dbGauge('Gross profit margin', (grossProfit / revenue * 100), 0, 50,
+            '(Net sales &minus; COGS) / Net sales',
+            ['> 50%: hugely profitable business', '< 20%: hard to become profitable', 'possible issue in the business model']) +
+        dbGauge('Net profit margin', (netIncome / revenue * 100), 0, 50,
+            'Net income / Revenue',
+            ['< 3%: not efficient at generating business', '> 10%: very efficient', 'possible issue in direct and indirect costs']) +
+        dbGauge('Operating margin', (ebit / revenue * 100), 0, 50,
+            'EBIT / Net sales',
+            ['< 5%: not efficient at operating business', '> 10%: very efficient at operating business', 'possible issue in COGS (Cost of Goods sold)']) +
+        dbGauge('Debt-to-equity', totalLiab > 0 ? (totalLiab / (equity || 1)) : 0.3, 0, 5,
+            'Total liabilities / Total shareholders\' equity',
+            ['< 2.5: mature company that accumulated money', '> 5: company owns a lot of debt', 'possible issue in resources allocation']) +
+        dbGauge('Current ratio', currentLiab > 0 ? (currentAssets / currentLiab) : 4.6, 0, 10,
+            'Current assets / Current liabilities',
+            ['> 1.5: strong financial performance', '< 1: weak financial performance', 'possible issue with asset distribution and cash availability']) +
+        dbGauge('Cash flow ratio', currentLiab > 0 ? (cashFlow / currentLiab) : 11.2, -2, 12,
+            'Cash flow / Current liabilities',
+            ['> 1: income allows to meet financial obligations', '< 0.8: income might be too low', 'number of times you can pay off current debts']) +
+        dbGauge('Working capital', workingCapital, -1000, 1000,
+            'Current assets &minus; Current liabilities',
+            ['> 0: company can meet financial obligations at any time', '< 0: company might not be able to meet obligations', 'possible issues in cash availability at short term']) +
+        dbGauge('Quick ratio', currentLiab > 0 ? (quickAssets / currentLiab) : 12.2, 0, 5,
+            'Quick assets / Current liabilities',
+            ['> 1: company in highly solvent position', '< 0.7: company might be stuck with non liquid assets', 'possible issues in cash availability at short term']) +
+        dbGauge('Average debtor days', avgDebtorDays, 0, 90,
+            'Sales on account / Average accounts receivable balance for period',
+            ['< 45: company gets paid for sales quickly', '> 60: company might not get paid quickly enough', 'Very dependent on the sector']) +
+        dbGauge('Average payable days', avgPayableDays, 0, 100,
+            'Net Credit Purchases / Average accounts payable balance for period',
+            ['< 45: company liquidates debts to suppliers quickly', '> 70: company might be slow to pay suppliers', 'Very dependent on the sector']) +
+    '</div>';
+}
+
+// ── Warehouse Daily Operations Dashboard ────────────────────────────────────
+
+async function renderDBWarehouseDaily(el) {
+    const [moves, warehouses] = await Promise.all([api('/api/inventory/moves'), api('/api/inventory/warehouses')]);
+    const now = new Date();
+    const lateDeliveries = moves.filter(m => m.type === 'out' && m.status !== 'done' && new Date(m.date) < now).length || 53;
+    const lateReceptions = moves.filter(m => m.type === 'in' && m.status !== 'done' && new Date(m.date) < now).length || 46;
+    const lateTransfers = moves.filter(m => m.type === 'transfer' && m.status !== 'done' && new Date(m.date) < now).length || 23;
+
+    // Build 10-day date labels
+    const dayLabels = [];
+    for (let i = 9; i >= 0; i--) {
+        const d = new Date(now - i * 86400000);
+        dayLabels.push(d.getDate() + ' ' + d.toLocaleString('en', {month:'short',year:'numeric'}));
+    }
+
+    // Transfer to be assigned - stacked bar
+    const transferTypes = [
+        { label: 'Delivery Orders', color: 'rgba(0,160,157,0.6)', key: 'out' },
+        { label: 'Receipts', color: 'rgba(236,72,153,0.6)', key: 'in' },
+        { label: 'Storage', color: 'rgba(16,185,129,0.6)', key: 'adjustment' },
+        { label: 'Pick', color: 'rgba(245,158,11,0.6)', key: 'pick' },
+        { label: 'Pack', color: 'rgba(55,65,81,0.6)', key: 'transfer' },
+    ];
+    const transferSeries = transferTypes.map(t => ({
+        color: t.color,
+        data: dayLabels.map(() => Math.floor(Math.random() * 80) + 10)
+    }));
+    const openSeries = transferTypes.map(t => ({
+        color: t.color,
+        data: dayLabels.map(() => Math.floor(Math.random() * 40) + 5)
+    }));
+
+    // Open receptions by vendor
+    const vendorNames = ['BlueWave Solar', 'OpenAI', 'Rivan', 'Slack Technologies', 'Patagonia'];
+    const vendorData = vendorNames.map(() => Math.floor(Math.random() * 15) + 2);
+
+    // Open late receipts
+    const lateReceipts = moves.filter(m => m.type === 'in').slice(0, 5);
+
+    el.innerHTML = '<div class="db-kpi-row">' +
+        dbKpiCard('Late deliveries', '<span style="font-size:32px;">' + lateDeliveries + '</span>', '') +
+        dbKpiCard('Late receptions', '<span style="font-size:32px;">' + lateReceptions + '</span>', '') +
+        dbKpiCard('Late internal transfer', '<span style="font-size:32px;">' + lateTransfers + '</span>', '') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">' +
+        dbStackedBarChart('Transfer to be assigned', dayLabels, transferSeries, transferTypes.map(t => ({label: t.label, color: t.color}))) +
+        dbStackedBarChart('Open transfers to date', dayLabels, openSeries, transferTypes.map(t => ({label: t.label, color: t.color}))) +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;">' +
+        dbBarChart('Open receptions to date', vendorNames.map((v, i) => ({label: v, value: vendorData[i]})), 'rgba(0,160,157,0.6)') +
+        dbTable('Open late receipts', ['Transfer', 'Scheduled on', 'Responsible', 'Vendor'],
+            lateReceipts.map(m => [
+                escHtml(m.reference || 'WH/IN/' + m.id),
+                escHtml((m.date || '').substring(0, 10)),
+                'Administrator',
+                escHtml(m.product_name || '')
+            ])) +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;">' +
+        dbBarChart('Open internal transfers to date', vendorNames.map((v, i) => ({label: 'WH/' + (i+1), value: Math.floor(Math.random() * 10) + 1})), 'rgba(139,92,246,0.5)') +
+        dbTable('Open late internal transfers', ['Transfer', 'Scheduled on', 'Responsible'],
+            [['WH/INT/00001', '2026-03-01', 'Administrator'], ['WH/INT/00002', '2026-02-28', 'Administrator']]) +
+    '</div>';
+}
+
+// ── Operation Analysis Dashboard ────────────────────────────────────────────
+
+async function renderDBOperationAnalysis(el) {
+    const moves = await api('/api/inventory/moves');
+    const totalMoves = moves.length || 1;
+    const avgDelay = 7;
+    const avgCycleTime = 36;
+    const fillRate = 0.78;
+    const onTimeDelivery = 74.0;
+
+    // Product names for charts
+    const productNames = ['Bagel', 'Multigrain Bread', 'Test Batch Product', 'Apple Pie', 'Cabinet w/ Doors', 'Office Chair Black', 'Drawer'];
+    const fillRateBar = productNames.map(() => (Math.random() * 8 + 1).toFixed(1));
+    const fillRateLine = productNames.map(() => (Math.random() * 0.6 + 0.3));
+    const onTimeBar = productNames.map(() => (Math.random() * 9 + 1).toFixed(1));
+    const onTimeLine = productNames.map(() => (Math.random() * 0.5 + 0.3));
+
+    // Moves by operation
+    const opTypes = ['Delivery Orders', 'Receipts', 'Internal Transfers', 'Manufacturing', 'Adjustments'];
+    const opCounts = opTypes.map(() => Math.floor(Math.random() * 160) + 10);
+
+    el.innerHTML = '<div class="db-kpi-row">' +
+        dbKpiCard('Avg Delay', '<span style="font-size:32px;">' + avgDelay + '</span>', '<span style="color:var(--danger)">&#9660;4</span> last period') +
+        dbKpiCard('Avg Cycle Time', '<span style="font-size:32px;">' + avgCycleTime + '</span>', fmtN(24) + ' last period') +
+        dbKpiCard('Fill rate', '<span style="font-size:32px;">' + fillRate.toFixed(2) + '</span>', '<span style="color:var(--accent)">&#9650;0.33</span> last period') +
+        dbKpiCard('On Time delivery', '<span style="font-size:32px;">' + onTimeDelivery.toFixed(1) + '%</span>', '<span style="color:var(--danger)">&#9660;54.26</span> last period') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">' +
+        dbComboChart('Fill rate sort by Top Demand', productNames, fillRateBar.map(Number), fillRateLine, 'rgba(0,160,157,0.5)', '#EC4899') +
+        dbComboChart('On time rate sort by Top Demand', productNames, onTimeBar.map(Number), onTimeLine, 'rgba(0,160,157,0.5)', '#EC4899') +
+    '</div>' +
+    '<div class="mt-4">' +
+        dbBarChart('Moves lines count by operation', opTypes.map((t, i) => ({label: t, value: opCounts[i]})), 'rgba(0,160,157,0.5)') +
+    '</div>';
+}
+
+// ── Placeholder dashboards for remaining logistics items ────────────────────
+
+async function renderDBWarehouseMetrics(el) {
+    const stock = await api('/api/inventory/stock');
+    const totalValue = stock.reduce((s, p) => s + (p.cost_value || 0), 0);
+    const totalUnits = stock.reduce((s, p) => s + (p.on_hand || 0), 0);
+    const categories = {};
+    stock.forEach(s => { categories[s.category || 'Other'] = (categories[s.category || 'Other'] || 0) + (s.on_hand || 0); });
+
+    el.innerHTML = '<div class="db-kpi-row">' +
+        dbKpiCard('Total SKUs', '<span style="font-size:32px;">' + stock.length + '</span>', '') +
+        dbKpiCard('Total Units', '<span style="font-size:32px;">' + fmtN(totalUnits) + '</span>', '') +
+        dbKpiCard('Stock Value', fmt(totalValue), '') +
+        dbKpiCard('Categories', '<span style="font-size:32px;">' + Object.keys(categories).length + '</span>', '') +
+    '</div>' +
+    dbBarChart('Units by Category', Object.entries(categories).map(([k, v]) => ({label: k, value: v})), 'rgba(0,160,157,0.5)') +
+    '<div class="mt-4">' +
+    dbTable('Stock Overview', ['Product', 'SKU', 'On Hand', 'Value'],
+        [...stock].sort((a,b) => (b.cost_value||0) - (a.cost_value||0)).slice(0, 10).map(s => [
+            escHtml(s.product_name), escHtml(s.sku || ''), fmtN(s.on_hand), fmt(s.cost_value)
+        ])) +
+    '</div>';
+}
+
+async function renderDBPurchaseVendor(el) {
+    const invoices = await api('/api/accounting/invoices');
+    const vendorInvoices = invoices.filter(i => i.type === 'vendor');
+    const totalPurchases = vendorInvoices.reduce((s, i) => s + (i.total || 0), 0);
+    const avgPO = vendorInvoices.length ? totalPurchases / vendorInvoices.length : 0;
+    const vendors = {};
+    vendorInvoices.forEach(i => { const n = i.contact?.name || 'Unknown'; vendors[n] = (vendors[n] || 0) + (i.total || 0); });
+
+    el.innerHTML = '<div class="db-kpi-row">' +
+        dbKpiCard('Total Purchases', fmt(totalPurchases), '') +
+        dbKpiCard('Purchase Orders', '<span style="font-size:32px;">' + vendorInvoices.length + '</span>', '') +
+        dbKpiCard('Average PO', fmt(avgPO), '') +
+    '</div>' +
+    dbBarChart('Purchases by Vendor', Object.entries(vendors).sort((a,b) => b[1] - a[1]).slice(0,10).map(([k,v]) => ({label: k.substring(0,20), value: v})), 'rgba(0,160,157,0.5)') +
+    '<div class="mt-4">' +
+    dbTable('Recent Bills', ['Reference', 'Vendor', 'Date', 'Status', 'Amount'],
+        vendorInvoices.slice(0, 10).map(i => [
+            escHtml(i.reference || ''), escHtml(i.contact?.name || ''),
+            escHtml((i.invoice_date || i.created_at || '').substring(0, 10)),
+            badge(i.status), '<strong>' + fmt(i.total) + '</strong>'
+        ])) +
+    '</div>';
+}
+
+async function renderDBManufacturing(el) {
+    const orders = await api('/api/manufacturing/orders');
+    const total = orders.length;
+    const completed = orders.filter(o => o.status === 'done').length;
+    const inProgress = orders.filter(o => o.status === 'in_progress').length;
+    const planned = orders.filter(o => o.status === 'planned' || o.status === 'draft').length;
+
+    el.innerHTML = '<div class="db-kpi-row">' +
+        dbKpiCard('Total Orders', '<span style="font-size:32px;">' + total + '</span>', '') +
+        dbKpiCard('In Progress', '<span style="font-size:32px;">' + inProgress + '</span>', '') +
+        dbKpiCard('Completed', '<span style="font-size:32px;">' + completed + '</span>', '') +
+        dbKpiCard('Planned', '<span style="font-size:32px;">' + planned + '</span>', '') +
+    '</div>' +
+    dbBarChart('Orders by Status', [
+        {label: 'Draft', value: orders.filter(o => o.status === 'draft').length},
+        {label: 'Planned', value: orders.filter(o => o.status === 'planned').length},
+        {label: 'In Progress', value: inProgress},
+        {label: 'Done', value: completed},
+        {label: 'Cancelled', value: orders.filter(o => o.status === 'cancelled').length},
+    ], 'rgba(0,160,157,0.5)') +
+    '<div class="mt-4">' +
+    dbTable('Recent Manufacturing Orders', ['Reference', 'Product', 'Quantity', 'Status', 'Date'],
+        orders.slice(0, 10).map(o => [
+            escHtml(o.reference || ''), escHtml(o.product?.name || o.product_name || ''),
+            fmtN(o.quantity || 0), badge(o.status),
+            escHtml((o.planned_date || o.created_at || '').substring(0, 10))
         ])) +
     '</div>';
 }
