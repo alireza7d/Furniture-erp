@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FurnitureERP</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="app-layout" id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">Furniture<span>ERP</span></div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">Main</div>
+            <a class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+                <span class="icon">&#9632;</span> Dashboard
+            </a>
+
+            <div class="nav-section">Sales</div>
+            <a class="nav-item" data-page="crm" onclick="navigate('crm')">
+                <span class="icon">&#9733;</span> CRM
+            </a>
+            <a class="nav-item" data-page="sales" onclick="navigate('sales')">
+                <span class="icon">&#9830;</span> Sales
+            </a>
+            <a class="nav-item" data-page="pos" onclick="navigate('pos')">
+                <span class="icon">&#9641;</span> Point of Sale
+            </a>
+
+            <div class="nav-section">Operations</div>
+            <a class="nav-item" data-page="inventory" onclick="navigate('inventory')">
+                <span class="icon">&#9634;</span> Inventory
+            </a>
+            <a class="nav-item" data-page="purchase" onclick="navigate('purchase')">
+                <span class="icon">&#9660;</span> Purchase
+            </a>
+            <a class="nav-item" data-page="manufacturing" onclick="navigate('manufacturing')">
+                <span class="icon">&#9881;</span> Manufacturing
+            </a>
+
+            <div class="nav-section">Finance</div>
+            <a class="nav-item" data-page="accounting" onclick="navigate('accounting')">
+                <span class="icon">&#9783;</span> Accounting
+            </a>
+
+            <div class="nav-section">Marketing</div>
+            <a class="nav-item" data-page="email-marketing" onclick="navigate('email-marketing')">
+                <span class="icon">&#9993;</span> Email Marketing
+            </a>
+            <a class="nav-item" data-page="sms-marketing" onclick="navigate('sms-marketing')">
+                <span class="icon">&#9742;</span> SMS Marketing
+            </a>
+
+            <div class="nav-section">Master Data</div>
+            <a class="nav-item" data-page="contacts" onclick="navigate('contacts')">
+                <span class="icon">&#9786;</span> Contacts
+            </a>
+            <a class="nav-item" data-page="products" onclick="navigate('products')">
+                <span class="icon">&#9642;</span> Products
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Area -->
+    <div class="main-area">
+        <header class="top-header">
+            <div class="header-left">
+                <div class="breadcrumb">
+                    <span>FurnitureERP</span>
+                    <span>/</span>
+                    <span class="current" id="breadcrumb-page">Dashboard</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="search-box">
+                    <span class="search-icon">&#128269;</span>
+                    <input type="text" placeholder="Search..." id="global-search">
+                </div>
+                <div class="user-avatar">AD</div>
+            </div>
+        </header>
+
+        <main class="content-area" id="content">
+            <!-- Dynamic content loaded here -->
+        </main>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+    <div class="modal" id="modal">
+        <div class="modal-header">
+            <span id="modal-title">Title</span>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer" id="modal-footer"></div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
