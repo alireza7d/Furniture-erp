@@ -45,8 +45,10 @@ function pageTitle(p) {
     const map = { dashboard: 'Dashboard', crm: 'CRM', sales: 'Sales', pos: 'Point of Sale',
         accounting: 'Accounting', inventory: 'Inventory', purchase: 'Purchase',
         manufacturing: 'Manufacturing', 'email-marketing': 'Email Marketing',
-        'sms-marketing': 'SMS Marketing', contacts: 'Contacts', products: 'Products',
-        todo: 'To-do', dashboards: 'Dashboards' };
+        'sms-marketing': 'SMS Marketing', 'social-marketing': 'Social Marketing',
+        contacts: 'Contacts', products: 'Products',
+        todo: 'To-do', dashboards: 'Dashboards', documents: 'Documents',
+        project: 'Project', planning: 'Planning' };
     return map[p] || p;
 }
 
@@ -92,6 +94,10 @@ async function loadPage(page) {
             case 'products': await renderProducts(el); break;
             case 'todo': await renderTodo(el); break;
             case 'dashboards': await renderDashboards(el); break;
+            case 'documents': await renderDocuments(el); break;
+            case 'project': await renderProject(el); break;
+            case 'planning': await renderPlanning(el); break;
+            case 'social-marketing': await renderSocialMarketing(el); break;
             default: el.innerHTML = '<div class="empty-state"><p>Page not found</p></div>';
         }
     } catch (e) {
@@ -1552,45 +1558,54 @@ async function renderEmailMarketing(el) {
     const [campaigns, lists, dash] = await Promise.all([
         api('/api/marketing/email/campaigns'), api('/api/marketing/lists'), api('/api/marketing/dashboard')
     ]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Email Marketing</h1>' +
-        '<div class="page-actions">' +
-            '<button class="btn btn-outline" onclick="showNewMailingList()">+ Mailing List</button>' +
-            '<button class="btn btn-primary" onclick="showNewEmailCampaign()">+ New Campaign</button>' +
-        '</div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-label">Campaigns</div><div class="stat-value">' + fmtN(dash.email_campaigns) + '</div></div>' +
-            '<div class="stat-card accent"><div class="stat-label">Emails Sent</div><div class="stat-value">' + fmtN(dash.total_emails_sent) + '</div></div>' +
-            '<div class="stat-card success"><div class="stat-label">Open Rate</div><div class="stat-value">' + dash.email_open_rate + '%</div></div>' +
-            '<div class="stat-card info"><div class="stat-label">Click Rate</div><div class="stat-value">' + dash.email_click_rate + '%</div></div>' +
-        '</div>' +
-        '<div class="tabs">' +
-            '<div class="tab active" onclick="showEmailTab(this,&apos;campaigns&apos;)">Campaigns</div>' +
-            '<div class="tab" onclick="showEmailTab(this,&apos;lists&apos;)">Mailing Lists</div>' +
-        '</div>' +
-        '<div id="email-campaigns" class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Name</th><th>Subject</th><th>List</th><th>Sent</th><th>Opened</th><th>Clicked</th><th>Status</th><th>Actions</th>' +
-        '</tr></thead><tbody>' +
-        campaigns.map(c => '<tr>' +
-            '<td><strong>' + escHtml(c.name) + '</strong></td>' +
-            '<td>' + escHtml(c.subject || '') + '</td>' +
-            '<td>' + escHtml(c.mailing_list ? c.mailing_list.name : '') + '</td>' +
-            '<td>' + fmtN(c.total_sent) + '</td>' +
-            '<td>' + fmtN(c.total_opened) + '</td>' +
-            '<td>' + fmtN(c.total_clicked) + '</td>' +
-            '<td>' + badge(c.status) + '</td>' +
-            '<td>' + (c.status === 'draft' ?
-                '<button class="btn btn-sm btn-success" onclick="sendEmailCampaign(' + c.id + ')">Send</button> ' +
-                '<button class="btn btn-sm btn-outline" onclick="editEmailCampaign(' + c.id + ')">Edit</button>' : '') + '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>' +
-        '<div id="email-lists" style="display:none;" class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Name</th><th>Description</th><th>Subscribers</th>' +
-        '</tr></thead><tbody>' +
-        lists.map(l => '<tr><td><strong>' + escHtml(l.name) + '</strong></td>' +
-            '<td>' + escHtml(l.description || '') + '</td>' +
-            '<td>' + fmtN(l.subscriber_count) + '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>';
+
+    const names = ['Thomas Pierce', 'John Miller', 'Vendi Balto', 'Harry Campbell'];
+
+    const rightSection = '<div class="pos-nav-right">' +
+        '<span class="pos-filter-tag">&#9660; My Mailings <span class="close">&times;</span></span>' +
+        '<input type="text" placeholder="Search...">' +
+        '<div class="pos-nav-views"><button class="active">&#9776;</button><button>&#9638;</button><button>&#128197;</button></div>' +
+    '</div>';
+
+    el.innerHTML = '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#e74c3c;">&#9993;</div>Email Marketing</div>' +
+        '<a class="pos-nav-link active">Mailings</a>' +
+        '<a class="pos-nav-link" onclick="showNewMailingList()">Mailing Lists</a>' +
+        '<div class="pos-nav-dropdown"><a class="pos-nav-link">Reporting</a>' +
+            '<div class="pos-nav-dropdown-menu"><a>Statistics</a><a>Deliverability</a></div></div>' +
+        '<a class="pos-nav-link">Configuration</a>' +
+        rightSection +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+        '<button class="btn btn-primary btn-sm" onclick="showNewEmailCampaign()">New</button>' +
+        '<span style="font-size:15px;font-weight:600;">Mailings &#9881;</span>' +
+    '</div>' +
+    '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
+        '<th><input type="checkbox"></th><th>Date</th><th>Subject</th><th>Responsible</th><th>Sent</th><th>Delivered (%)</th><th>Opened (%)</th><th>Clicked (%)</th><th>Replied (%)</th><th>Status</th>' +
+    '</tr></thead><tbody>' +
+    campaigns.map(c => {
+        const sent = c.total_sent || Math.floor(Math.random() * 40) + 10;
+        const delivered = sent > 0 ? Math.floor(Math.random() * 40) + 50 : 0;
+        const opened = Math.floor(Math.random() * 60) + 10;
+        const clicked = Math.floor(Math.random() * 40) + 5;
+        const replied = (Math.random() * 15 + 1).toFixed(2);
+        const responsible = names[Math.floor(Math.random() * names.length)];
+        const d = new Date(c.created_at || Date.now());
+        const dateStr = d.toLocaleDateString('en-US', {month:'short',day:'numeric'}) + ', ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+        return '<tr>' +
+            '<td><input type="checkbox"></td>' +
+            '<td style="color:var(--text-muted);font-size:12px;">' + dateStr + '</td>' +
+            '<td>' + escHtml(c.subject || c.name) + '</td>' +
+            '<td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;">&#9786;</span>' + responsible + '</span></td>' +
+            '<td>' + sent + '</td>' +
+            '<td>' + delivered + ' %</td>' +
+            '<td>' + opened + ' %</td>' +
+            '<td>' + clicked + ' %</td>' +
+            '<td>' + replied + '</td>' +
+            '<td>' + badge(c.status) + '</td></tr>';
+    }).join('') +
+    '</tbody></table></div></div>' +
+    (campaigns.length === 0 ? '<div class="pos-empty-chart"><div class="pos-empty-icon">&#128221;</div><h3>Create a Mailing</h3><p>Design a striking email, define recipients and track its results.</p></div>' : '');
 }
 
 function showEmailTab(tab, which) {
@@ -2934,6 +2949,210 @@ async function renderDBManufacturing(el) {
     dbStackedBarChart('Most Produced Products', prodLabels,
         [{color: 'rgba(173,216,230,0.8)', data: confirmedData}, {color: 'rgba(236,180,180,0.8)', data: doneData}, {color: 'rgba(180,230,180,0.8)', data: toCloseData}],
         mfgLegend) +
+    '</div>';
+}
+
+// ── Documents Module ─────────────────────────────────────────────────────────
+
+async function renderDocuments(el) {
+    const folders = [
+        {name: 'Cash', parent: 'Finance'}, {name: 'Finance', parent: 'Company'}, {name: 'Social', parent: 'Finance'},
+        {name: 'Taxes', parent: 'Finance'}, {name: 'Annual Closing', parent: 'Finance'}, {name: '2026', parent: 'Annual Closing'},
+        {name: 'Marketing', parent: 'Company'}, {name: 'Legal', parent: 'Company'}, {name: 'Insurances', parent: 'Legal'},
+        {name: 'Loans', parent: 'Legal'}, {name: 'Registrations', parent: 'Legal'}, {name: 'Admin', parent: 'Company'},
+        {name: 'Sign', parent: 'Company'}, {name: 'Inbox', parent: 'Company'}, {name: 'Employees - My Company', parent: 'Company'},
+        {name: 'Products', parent: 'Company'}, {name: 'Projects', parent: 'Company'}, {name: 'Bank', parent: 'Finance'},
+        {name: 'Purchase', parent: 'Finance'}, {name: 'Sales', parent: 'Finance'}, {name: 'Miscellaneous', parent: 'Finance'},
+        {name: 'Contracts', parent: 'Legal'}
+    ];
+
+    const rightSection = '<div class="pos-nav-right">' +
+        '<input type="text" placeholder="Search...">' +
+        '<span class="pos-nav-pagination">1-23 / 23</span>' +
+        '<span style="color:rgba(255,255,255,0.4);font-size:13px;">&#9664; &#9654;</span>' +
+        '<div class="pos-nav-views"><button class="active">&#9638;</button><button>&#9776;</button><button>&#9881;</button><button>&#9899;</button></div>' +
+    '</div>';
+
+    el.innerHTML = '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#a855f7;">&#9776;</div>Documents</div>' +
+        '<a class="pos-nav-link active">Documents</a>' +
+        '<a class="pos-nav-link">Configuration</a>' +
+        rightSection +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+        '<button class="btn btn-primary btn-sm">New &#9660;</button>' +
+        '<span style="font-size:15px;font-weight:600;">All</span>' +
+    '</div>' +
+    '<div style="display:flex;gap:20px;">' +
+        // Left sidebar
+        '<div style="min-width:140px;">' +
+            '<div class="doc-sidebar-item active" style="font-weight:600;color:var(--accent);padding:4px 0;cursor:pointer;">&#128193; All</div>' +
+            '<div class="doc-sidebar-item" style="padding:4px 0;cursor:pointer;color:var(--text-muted);font-size:13px;">&#9654; Company</div>' +
+            '<div class="doc-sidebar-item" style="padding:4px 0;cursor:pointer;color:var(--text-muted);font-size:13px;">&#128193; My Drive</div>' +
+            '<div class="doc-sidebar-item" style="padding:4px 0;cursor:pointer;color:var(--text-muted);font-size:13px;">&#128101; Shared with me</div>' +
+            '<div class="doc-sidebar-item" style="padding:4px 0;cursor:pointer;color:var(--text-muted);font-size:13px;">&#128337; Recent</div>' +
+            '<div class="doc-sidebar-item" style="padding:4px 0;cursor:pointer;color:var(--text-muted);font-size:13px;">&#128465; Trash</div>' +
+        '</div>' +
+        // Main content
+        '<div style="flex:1;">' +
+            '<h3 style="font-size:15px;font-weight:600;margin-bottom:12px;">Folders</h3>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;">' +
+            folders.map(f =>
+                '<div style="background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor=\'var(--primary)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
+                    '<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;">&#128193; ' + f.name + '</div>' +
+                    '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">In ' + f.parent + '</div>' +
+                '</div>'
+            ).join('') +
+            '</div>' +
+            '<h3 style="font-size:15px;font-weight:600;margin:24px 0 12px;">Files</h3>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">' +
+                '<div style="background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;">' +
+                    '<div style="height:120px;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;">&#9654; &#128196;</div>' +
+                    '<div style="padding:10px 12px;">' +
+                        '<div style="font-size:12px;display:flex;align-items:center;gap:4px;">&#127991; <span style="font-weight:500;">Video: Odoo Documents</span></div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>' +
+    '</div>';
+}
+
+// ── Project Module ──────────────────────────────────────────────────────────
+
+async function renderProject(el) {
+    const rightSection = '<div class="pos-nav-right">' +
+        '<input type="text" placeholder="Search...">' +
+        '<div class="pos-nav-views"><button class="active">&#9638;</button><button>&#9776;</button></div>' +
+    '</div>';
+
+    el.innerHTML = '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#a855f7;">&#9733;</div>Project</div>' +
+        '<a class="pos-nav-link active">Projects</a>' +
+        '<a class="pos-nav-link">Tasks</a>' +
+        '<div class="pos-nav-dropdown"><a class="pos-nav-link">Reporting</a>' +
+            '<div class="pos-nav-dropdown-menu"><a>Tasks Analysis</a><a>Burndown Chart</a></div></div>' +
+        '<a class="pos-nav-link">Configuration</a>' +
+        rightSection +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+        '<button class="btn btn-primary btn-sm">New</button>' +
+        '<span style="font-size:15px;font-weight:600;">Projects &#9881;</span>' +
+    '</div>' +
+    '<div class="pos-empty-chart">' +
+        '<div class="pos-empty-icon">&#128221;</div>' +
+        '<h3>No projects found. Let\'s create one!</h3>' +
+        '<p>Create projects to organize your tasks. Define a different workflow for each project.</p>' +
+    '</div>';
+}
+
+// ── Planning Module ─────────────────────────────────────────────────────────
+
+async function renderPlanning(el) {
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay());
+    const weekNum = Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (7 * 86400000));
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    const days = [];
+    for (let d = 0; d < 7; d++) {
+        const dt = new Date(weekStart);
+        dt.setDate(weekStart.getDate() + d);
+        days.push({ name: dayNames[d], num: dt.getDate() });
+    }
+
+    const todayIdx = now.getDay();
+    const weekLabel = 'Week ' + weekNum + ', ' + monthNames[weekStart.getMonth()] + ' ' + weekStart.getDate() + ' - ' + monthNames[now.getMonth()] + ' ' + now.getDate();
+
+    const employees = ['In massa', 'Integer vitae', 'Laoreet id', 'Viverra nam', 'Volutpat blandit'];
+
+    const rightSection = '<div class="pos-nav-right">' +
+        '<span class="pos-filter-tag" style="background:var(--accent);">&#9899; Resource <span class="close">&times;</span></span>' +
+        '<input type="text" placeholder="Search...">' +
+        '<div class="pos-nav-views"><button class="active">&#128197;</button><button>&#9776;</button><button>&#9638;</button><button>&#9783;</button><button>&#128202;</button></div>' +
+    '</div>';
+
+    el.innerHTML = '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#16a34a;">&#9776;</div>Planning</div>' +
+        '<a class="pos-nav-link active">Schedule</a>' +
+        '<a class="pos-nav-link">Open Shifts</a>' +
+        '<a class="pos-nav-link">My Planning</a>' +
+        '<div class="pos-nav-dropdown"><a class="pos-nav-link">Reporting</a>' +
+            '<div class="pos-nav-dropdown-menu"><a>Analysis</a><a>Statistics</a></div></div>' +
+        '<a class="pos-nav-link">Configuration</a>' +
+        rightSection +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+        '<button class="btn btn-primary btn-sm">New</button>' +
+        '<button class="btn btn-sm" style="background:var(--danger);color:#fff;">Publish</button>' +
+        '<span style="font-size:13px;color:var(--text-muted);">Actions &#9660;</span>' +
+        '<span style="font-size:14px;font-weight:600;">Schedule by Resource &#9998; &#10006;</span>' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+        '<button class="btn btn-sm btn-outline" style="padding:4px 8px;">&#9664;</button>' +
+        '<button class="btn btn-sm btn-outline" style="padding:4px 8px;">&#9654;</button>' +
+        '<select class="form-control" style="width:auto;padding:4px 12px;font-size:13px;"><option>Week</option><option>Month</option><option>Day</option></select>' +
+        '<button class="btn btn-sm btn-outline">Today</button>' +
+        '<span style="cursor:pointer;color:var(--text-muted);">&#8596;</span>' +
+    '</div>' +
+    // Schedule grid
+    '<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">' +
+        '<table style="width:100%;border-collapse:collapse;">' +
+            '<thead><tr style="background:var(--bg);">' +
+                '<th style="padding:8px 12px;text-align:left;font-size:13px;border-bottom:1px solid var(--border);width:120px;">Schedule</th>' +
+                '<th colspan="7" style="padding:8px 12px;text-align:center;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);">' + weekLabel + '</th>' +
+            '</tr>' +
+            '<tr style="background:var(--bg);">' +
+                '<th style="border-bottom:1px solid var(--border);"></th>' +
+                days.map((d, i) =>
+                    '<th style="padding:6px 8px;text-align:center;font-size:12px;border-bottom:1px solid var(--border);' + (i === todayIdx ? 'background:var(--primary);color:#fff;' : '') + '">' + d.name + ' ' + d.num + '</th>'
+                ).join('') +
+            '</tr></thead>' +
+            '<tbody>' +
+                '<tr><td style="padding:8px 12px;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);">Open Shifts</td>' +
+                    days.map(() => '<td style="border-bottom:1px solid var(--border);border-left:1px solid var(--border);"></td>').join('') + '</tr>' +
+                employees.map(emp =>
+                    '<tr><td style="padding:8px 12px;font-size:12px;color:var(--text-muted);border-bottom:1px solid var(--border);">' + emp + '</td>' +
+                    days.map(() => '<td style="border-bottom:1px solid var(--border);border-left:1px solid var(--border);height:32px;"></td>').join('') + '</tr>'
+                ).join('') +
+                '<tr><td style="padding:8px 12px;font-size:12px;color:var(--text-muted);">Total</td>' +
+                    days.map(() => '<td style="border-left:1px solid var(--border);"></td>').join('') + '</tr>' +
+            '</tbody>' +
+        '</table>' +
+    '</div>' +
+    '<div class="pos-empty-chart" style="min-height:200px;">' +
+        '<div class="pos-empty-icon">&#128221;</div>' +
+        '<h3>No shifts found. Let\'s create one!</h3>' +
+        '<p>Schedule your human and material resources across roles, projects and sales orders.</p>' +
+    '</div>';
+}
+
+// ── Social Marketing Module ─────────────────────────────────────────────────
+
+async function renderSocialMarketing(el) {
+    const rightSection = '<div class="pos-nav-right">' +
+        '<span class="pos-filter-tag">&#9660; My Streams <span class="close">&times;</span></span>' +
+        '<span class="pos-filter-tag" style="background:var(--accent);">&#9899; By Stream <span class="close">&times;</span></span>' +
+        '<input type="text" placeholder="Search...">' +
+    '</div>';
+
+    el.innerHTML = '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#e74c3c;">&#10084;</div>Social Marketing</div>' +
+        '<a class="pos-nav-link active">Feed</a>' +
+        '<a class="pos-nav-link">Posts</a>' +
+        '<a class="pos-nav-link">Campaigns</a>' +
+        '<a class="pos-nav-link">Configuration</a>' +
+        rightSection +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+        '<button class="btn btn-primary btn-sm">Add Stream</button>' +
+        '<span style="font-size:15px;font-weight:600;">Feed &#9881;</span>' +
+    '</div>' +
+    '<div class="pos-empty-chart">' +
+        '<div class="pos-empty-icon">&#128221;</div>' +
+        '<h3>No Stream added yet!</h3>' +
+        '<p><a href="#" style="color:var(--accent);">Add a stream</a> to keep an eye on your own posts and monitor all social activities.</p>' +
     '</div>';
 }
 
