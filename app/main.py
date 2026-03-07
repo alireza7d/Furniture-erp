@@ -4,13 +4,13 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
 from app.database import engine, Base
-from app.routers import contacts, products, crm, sales, pos, accounting, inventory, purchase, manufacturing, marketing, todo
+from app.routers import contacts, products, crm, sales, pos, accounting, inventory, purchase, manufacturing, marketing, todo, users
 from app.seed import seed
 
 # Create tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="FurnitureERP", version="1.0.0")
+app = FastAPI(title="Asra Home Furniture", version="1.0.0")
 
 # Static files & templates
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -28,6 +28,7 @@ app.include_router(purchase.router)
 app.include_router(manufacturing.router)
 app.include_router(marketing.router)
 app.include_router(todo.router)
+app.include_router(users.router)
 
 
 @app.get("/", response_class=HTMLResponse)

@@ -13,6 +13,17 @@ def seed():
         db.close()
         return
 
+    # ── Default Admin User ──────────────────────────────────────────────────────
+    import hashlib
+    if not db.query(User).first():
+        admin = User(
+            name="Alireza Rahmani", email="alireza.3284@gmail.com",
+            password_hash=hashlib.sha256("admin".encode()).hexdigest(),
+            role="administrator"
+        )
+        db.add(admin)
+        db.flush()
+
     # ── Warehouse ──────────────────────────────────────────────────────────────
     wh = Warehouse(name="Main Warehouse", code="WH01", address="123 Factory Lane, Industrial District")
     showroom = Warehouse(name="Showroom", code="SHOW", address="456 Main Street, Downtown")

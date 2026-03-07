@@ -492,6 +492,45 @@ class TodoItem(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class UserRole(str, enum.Enum):
+    ADMIN = "administrator"
+    USER = "user"
+    READONLY = "readonly"
+
+
+class InviteStatus(str, enum.Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    EXPIRED = "expired"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False)
+    email = Column(String(200), unique=True, nullable=False)
+    password_hash = Column(String(200), nullable=False)
+    role = Column(String(20), default=UserRole.USER.value)
+    is_active = Column(Boolean, default=True)
+    last_login = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class UserInvite(Base):
+    __tablename__ = "user_invites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(200), nullable=False)
+    invited_by = Column(Integer, ForeignKey("users.id"))
+    token = Column(String(100), unique=True, nullable=False)
+    role = Column(String(20), default=UserRole.USER.value)
+    status = Column(String(20), default=InviteStatus.PENDING.value)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime)
+
+
 class SMSCampaign(Base):
     __tablename__ = "sms_campaigns"
 

@@ -3,11 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FurnitureERP</title>
+    <title>Asra Home Furniture</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-<div class="app-layout" id="app">
+<!-- Login Screen -->
+<div id="login-screen" style="display:none;position:fixed;inset:0;z-index:9999;background:#1a1a2e;display:flex;align-items:center;justify-content:center;">
+    <div style="background:#222;border-radius:12px;padding:40px;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+        <div style="text-align:center;margin-bottom:24px;">
+            <div style="font-size:28px;font-weight:700;color:#fff;">Asra Home Furniture</div>
+            <div style="color:#888;font-size:14px;margin-top:4px;">Sign in to your account</div>
+        </div>
+        <div id="login-error" style="display:none;background:#e74c3c22;border:1px solid #e74c3c;color:#e74c3c;padding:10px;border-radius:6px;margin-bottom:16px;font-size:13px;"></div>
+        <form id="login-form" onsubmit="handleLogin(event)">
+            <div style="margin-bottom:16px;">
+                <label style="display:block;color:#aaa;font-size:13px;margin-bottom:6px;">Email</label>
+                <input type="email" id="login-email" required placeholder="you@example.com"
+                    style="width:100%;padding:10px 12px;background:#333;border:1px solid #444;border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box;">
+            </div>
+            <div style="margin-bottom:24px;">
+                <label style="display:block;color:#aaa;font-size:13px;margin-bottom:6px;">Password</label>
+                <input type="password" id="login-password" required placeholder="Enter your password"
+                    style="width:100%;padding:10px 12px;background:#333;border:1px solid #444;border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box;">
+            </div>
+            <button type="submit" id="login-btn"
+                style="width:100%;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer;">
+                Sign In
+            </button>
+        </form>
+        <div id="register-section" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #333;">
+            <div style="color:#aaa;font-size:13px;margin-bottom:8px;">You've been invited! Complete your registration:</div>
+            <form id="register-form" onsubmit="handleRegister(event)">
+                <input type="hidden" id="reg-token">
+                <div style="margin-bottom:12px;">
+                    <input type="text" id="reg-name" required placeholder="Your full name"
+                        style="width:100%;padding:10px 12px;background:#333;border:1px solid #444;border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <input type="email" id="reg-email" readonly
+                        style="width:100%;padding:10px 12px;background:#2a2a2a;border:1px solid #444;border-radius:6px;color:#888;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <input type="password" id="reg-password" required placeholder="Choose a password" minlength="4"
+                        style="width:100%;padding:10px 12px;background:#333;border:1px solid #444;border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box;">
+                </div>
+                <button type="submit"
+                    style="width:100%;padding:12px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer;">
+                    Create Account
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="app-layout" id="app" style="display:none;">
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
@@ -89,6 +138,11 @@
             <a class="nav-item" data-page="products" onclick="navigate('products')">
                 <span class="icon">&#9642;</span> Products
             </a>
+
+            <div class="nav-section">Administration</div>
+            <a class="nav-item" data-page="settings" onclick="navigate('settings')">
+                <span class="icon">&#9881;</span> Settings
+            </a>
         </nav>
     </aside>
 
@@ -97,7 +151,7 @@
         <header class="top-header">
             <div class="header-left">
                 <div class="breadcrumb">
-                    <span>FurnitureERP</span>
+                    <span>Asra Home Furniture</span>
                     <span>/</span>
                     <span class="current" id="breadcrumb-page">Dashboard</span>
                 </div>
@@ -107,7 +161,12 @@
                     <span class="search-icon">&#128269;</span>
                     <input type="text" placeholder="Search..." id="global-search">
                 </div>
-                <div class="user-avatar">AD</div>
+                <div class="user-avatar" id="user-avatar" onclick="toggleUserMenu()" style="cursor:pointer;">AD</div>
+                <div id="user-menu" style="display:none;position:absolute;right:16px;top:52px;background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:180px;z-index:100;">
+                    <div id="user-menu-name" style="padding:12px 16px;font-weight:600;font-size:14px;border-bottom:1px solid var(--border);"></div>
+                    <a onclick="navigate('settings')" style="display:block;padding:10px 16px;font-size:13px;cursor:pointer;color:var(--text);">&#9881; Settings</a>
+                    <a onclick="handleLogout()" style="display:block;padding:10px 16px;font-size:13px;cursor:pointer;color:#e74c3c;">&#10140; Log out</a>
+                </div>
             </div>
         </header>
 

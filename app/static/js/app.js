@@ -1,10 +1,11 @@
 // ============================================================================
-// FurnitureERP — Single Page Application
+// Asra Home Furniture — Single Page Application
 // ============================================================================
 
 const API = '';
 let currentPage = 'dashboard';
 let posCart = [];
+let currentUser = null;
 
 // ── Utility Functions ───────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ function pageTitle(p) {
         contacts: 'Contacts', products: 'Products',
         todo: 'To-do', dashboards: 'Dashboards', documents: 'Documents',
         project: 'Project', planning: 'Planning', barcode: 'Barcode',
-        employees: 'Employees' };
+        employees: 'Employees', settings: 'Settings', 'manage-users': 'Users' };
     return map[p] || p;
 }
 
@@ -101,6 +102,8 @@ async function loadPage(page) {
             case 'social-marketing': await renderSocialMarketing(el); break;
             case 'barcode': await renderBarcode(el); break;
             case 'employees': await renderEmployees(el); break;
+            case 'settings': await renderSettings(el); break;
+            case 'manage-users': await renderManageUsers(el); break;
             default: el.innerHTML = '<div class="empty-state"><p>Page not found</p></div>';
         }
     } catch (e) {
@@ -3443,10 +3446,368 @@ function hrAppIcon(name, color) {
     '</div>';
 }
 
+// ── Authentication ──────────────────────────────────────────────────────────
+
+async function checkAuth() {
+    try {
+        currentUser = await api('/api/users/me');
+        showApp();
+    } catch (e) {
+        showLogin();
+    }
+}
+
+function showLogin() {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+}
+
+function showApp() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = '';
+    if (currentUser) {
+        const initials = currentUser.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        document.getElementById('user-avatar').textContent = initials;
+        document.getElementById('user-menu-name').textContent = currentUser.name;
+        // Hide admin-only items for non-admins
+        const settingsNav = document.querySelector('[data-page="settings"]');
+        if (settingsNav) settingsNav.style.display = currentUser.role === 'administrator' ? '' : 'none';
+    }
+    navigate('dashboard');
+}
+
+function toggleUserMenu() {
+    const menu = document.getElementById('user-menu');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    errEl.style.display = 'none';
+    try {
+        currentUser = await api('/api/users/login', { method: 'POST', body: { email, password } });
+        showApp();
+    } catch (err) {
+        errEl.textContent = err.message || 'Invalid email or password';
+        errEl.style.display = 'block';
+    }
+}
+
+async function handleLogout() {
+    try { await api('/api/users/logout', { method: 'POST' }); } catch (e) {}
+    currentUser = null;
+    document.getElementById('user-menu').style.display = 'none';
+    showLogin();
+}
+
+async function handleRegister(e) {
+    e.preventDefault();
+    const token = document.getElementById('reg-token').value;
+    const name = document.getElementById('reg-name').value;
+    const password = document.getElementById('reg-password').value;
+    try {
+        await api('/api/users/register', { method: 'POST', body: { token, name, password } });
+        toast('Account created! You can now sign in.');
+        document.getElementById('register-section').style.display = 'none';
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+// Close user menu when clicking outside
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('user-menu');
+    const avatar = document.getElementById('user-avatar');
+    if (menu && avatar && !menu.contains(e.target) && !avatar.contains(e.target)) {
+        menu.style.display = 'none';
+    }
+});
+
+// ── Settings Page ───────────────────────────────────────────────────────────
+
+let settingsSubNav = 'general';
+
+async function renderSettings(el) {
+    if (currentUser && currentUser.role !== 'administrator') {
+        el.innerHTML = '<div class="empty-state"><p>Administrator access required</p></div>';
+        return;
+    }
+
+    let users = [], invites = [];
+    try {
+        [users, invites] = await Promise.all([api('/api/users'), api('/api/users/invites')]);
+    } catch (e) {}
+
+    const sideNavItems = [
+        {key: 'general', icon: '&#9881;', label: 'General Settings'},
+        {key: 'crm', icon: '&#9733;', label: 'CRM'},
+        {key: 'sales', icon: '&#9830;', label: 'Sales'},
+        {key: 'inventory', icon: '&#9634;', label: 'Inventory'},
+        {key: 'manufacturing', icon: '&#9881;', label: 'Manufacturing'},
+        {key: 'accounting', icon: '&#9783;', label: 'Accounting'},
+        {key: 'project', icon: '&#9733;', label: 'Project'},
+        {key: 'sign', icon: '&#9997;', label: 'Sign'},
+        {key: 'planning', icon: '&#9776;', label: 'Planning'},
+        {key: 'email-marketing', icon: '&#9993;', label: 'Email Marketing'},
+        {key: 'employees', icon: '&#9786;', label: 'Employees'},
+        {key: 'documents', icon: '&#9776;', label: 'Documents'},
+        {key: 'pos', icon: '&#9641;', label: 'Point of Sale'},
+    ];
+
+    el.innerHTML =
+    // Module nav
+    '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#e74c3c;">&#9881;</div>Settings</div>' +
+        '<a class="pos-nav-link active">General Settings</a>' +
+        '<a class="pos-nav-link" onclick="navigate(\'manage-users\')">Users &amp; Companies</a>' +
+    '</div>' +
+    // Action bar
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:8px 0;">' +
+        '<button class="btn btn-primary btn-sm">Save</button>' +
+        '<button class="btn btn-outline btn-sm">Discard</button>' +
+        '<span style="font-size:15px;font-weight:600;">Settings</span>' +
+    '</div>' +
+    // Settings layout with left sidebar
+    '<div style="display:flex;gap:0;">' +
+        // Left settings sidebar
+        '<div style="width:180px;flex-shrink:0;border-right:1px solid var(--border);padding-right:0;">' +
+            sideNavItems.map(item =>
+                '<a onclick="settingsSubNav=\'' + item.key + '\'" style="display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:13px;cursor:pointer;color:' + (settingsSubNav === item.key ? 'var(--primary)' : 'var(--text-muted)') + ';background:' + (settingsSubNav === item.key ? 'var(--primary-light)' : 'transparent') + ';border-radius:4px;margin-bottom:2px;">' +
+                    '<span>' + item.icon + '</span> ' + item.label +
+                '</a>'
+            ).join('') +
+        '</div>' +
+        // Right content area
+        '<div style="flex:1;padding-left:24px;">' +
+            // Users section
+            '<div style="background:var(--primary);color:#fff;padding:10px 16px;font-weight:700;border-radius:6px 6px 0 0;font-size:14px;">Users</div>' +
+            '<div style="background:var(--bg-white);border:1px solid var(--border);border-top:0;border-radius:0 0 6px 6px;padding:20px;margin-bottom:24px;">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">' +
+                    // Left: Invite
+                    '<div>' +
+                        '<div style="font-weight:600;margin-bottom:12px;">Invite New Users</div>' +
+                        '<div style="display:flex;gap:8px;margin-bottom:16px;">' +
+                            '<input type="email" id="invite-email" placeholder="Enter an email" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);">' +
+                            '<button class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="inviteUser()">Invite</button>' +
+                        '</div>' +
+                        (invites.length > 0 ? '<div style="font-weight:600;margin-bottom:8px;">Pending Invitations:</div>' +
+                            invites.map(i =>
+                                '<span style="display:inline-block;padding:4px 10px;background:#1a3a4a;border:1px solid #2a5a6a;border-radius:4px;font-size:12px;margin:2px 4px 2px 0;">' +
+                                    escHtml(i.email) +
+                                    ' <span onclick="cancelInvite(' + i.id + ')" style="cursor:pointer;color:#e74c3c;">&times;</span>' +
+                                '</span>'
+                            ).join('') : '') +
+                    '</div>' +
+                    // Right: Active users
+                    '<div>' +
+                        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+                            '<span style="font-size:24px;">&#128101;</span>' +
+                            '<span style="font-weight:700;font-size:16px;">' + users.length + ' Active User' + (users.length !== 1 ? 's' : '') + '</span>' +
+                            '<span style="display:inline-block;width:16px;height:16px;background:#16a34a;border-radius:50%;text-align:center;color:#fff;font-size:10px;line-height:16px;">&#10003;</span>' +
+                        '</div>' +
+                        '<a onclick="navigate(\'manage-users\')" style="color:var(--primary);cursor:pointer;font-size:13px;">&#8594; Manage Users</a>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            // Languages section
+            '<div style="background:var(--primary);color:#fff;padding:10px 16px;font-weight:700;border-radius:6px 6px 0 0;font-size:14px;">Languages</div>' +
+            '<div style="background:var(--bg-white);border:1px solid var(--border);border-top:0;border-radius:0 0 6px 6px;padding:20px;margin-bottom:24px;">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">' +
+                    '<div><div style="font-weight:600;">1 Language</div><a style="color:var(--primary);cursor:pointer;font-size:13px;margin-top:4px;display:inline-block;">&#8594; Add Languages</a></div>' +
+                '</div>' +
+            '</div>' +
+            // Companies section
+            '<div style="background:var(--primary);color:#fff;padding:10px 16px;font-weight:700;border-radius:6px 6px 0 0;font-size:14px;">Companies</div>' +
+            '<div style="background:var(--bg-white);border:1px solid var(--border);border-top:0;border-radius:0 0 6px 6px;padding:20px;margin-bottom:24px;">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">' +
+                    '<div>' +
+                        '<div style="font-weight:700;">Asra Home Furniture</div>' +
+                        '<div style="color:var(--text-muted);font-size:13px;">Oman</div>' +
+                        '<a style="color:var(--primary);cursor:pointer;font-size:13px;margin-top:4px;display:inline-block;">&#8594; Update Info</a>' +
+                    '</div>' +
+                    '<div>' +
+                        '<div style="font-weight:700;">1 Company</div>' +
+                        '<a style="color:var(--primary);cursor:pointer;font-size:13px;margin-top:4px;display:inline-block;">&#8594; Manage Companies</a>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            // Document Layout & Email Templates
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">' +
+                '<div>' +
+                    '<div style="font-weight:600;margin-bottom:4px;">Document Layout</div>' +
+                    '<div style="color:var(--text-muted);font-size:13px;">Choose the layout of your documents</div>' +
+                    '<a style="color:var(--primary);cursor:pointer;font-size:13px;margin-top:4px;display:inline-block;">&#8594; Configure Document Layout</a>' +
+                '</div>' +
+                '<div>' +
+                    '<div style="font-weight:600;margin-bottom:4px;">Email Templates</div>' +
+                    '<div style="color:var(--text-muted);font-size:13px;">Customize the look and feel of automated emails</div>' +
+                    '<div style="margin-top:8px;">' +
+                        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;"><span style="font-size:13px;">Button Text</span><div style="width:36px;height:20px;background:#888;border-radius:10px;"></div></div>' +
+                        '<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:13px;">Button Color</span><div style="width:24px;height:24px;background:#f39c12;border-radius:50%;"></div></div>' +
+                    '</div>' +
+                    '<a style="color:var(--primary);cursor:pointer;font-size:13px;margin-top:8px;display:inline-block;">&#8594; Review All Templates</a>' +
+                '</div>' +
+            '</div>' +
+            // Units of Measure
+            '<div style="background:var(--primary);color:#fff;padding:10px 16px;font-weight:700;border-radius:6px 6px 0 0;font-size:14px;">Units of Measure</div>' +
+            '<div style="background:var(--bg-white);border:1px solid var(--border);border-top:0;border-radius:0 0 6px 6px;padding:20px;">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">' +
+                    '<div><div style="font-weight:600;">Weight</div><div style="color:var(--text-muted);font-size:13px;">Define your weight unit of measure</div></div>' +
+                    '<div><div style="font-weight:600;">Volume</div><div style="color:var(--text-muted);font-size:13px;">Define your volume unit of measure</div></div>' +
+                '</div>' +
+            '</div>' +
+        '</div>' +
+    '</div>';
+}
+
+async function inviteUser() {
+    const emailInput = document.getElementById('invite-email');
+    const email = emailInput.value.trim();
+    if (!email) { toast('Please enter an email', 'error'); return; }
+    try {
+        await api('/api/users/invite', { method: 'POST', body: { email, role: 'administrator' } });
+        toast('Invitation sent to ' + email);
+        emailInput.value = '';
+        navigate('settings');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function cancelInvite(id) {
+    try {
+        await api('/api/users/invites/' + id, { method: 'DELETE' });
+        toast('Invitation cancelled');
+        navigate('settings');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+// ── Manage Users Page ───────────────────────────────────────────────────────
+
+async function renderManageUsers(el) {
+    if (currentUser && currentUser.role !== 'administrator') {
+        el.innerHTML = '<div class="empty-state"><p>Administrator access required</p></div>';
+        return;
+    }
+
+    let users = [];
+    try { users = await api('/api/users'); } catch (e) {}
+    const colors = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c'];
+
+    el.innerHTML =
+    // Module nav
+    '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#e74c3c;">&#9881;</div>Settings</div>' +
+        '<a class="pos-nav-link" onclick="navigate(\'settings\')">General Settings</a>' +
+        '<a class="pos-nav-link active">Users &amp; Companies</a>' +
+    '</div>' +
+    // Breadcrumb
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">' +
+        '<button class="btn btn-primary btn-sm" onclick="showNewUserModal()">New</button>' +
+        '<a onclick="navigate(\'settings\')" style="color:var(--primary);cursor:pointer;font-size:13px;">Settings</a>' +
+        '<span style="color:var(--text-muted);font-size:13px;">&#8250;</span>' +
+        '<span style="font-size:15px;font-weight:600;">Users &#9881;</span>' +
+        '<div style="flex:1;"></div>' +
+        '<span class="pos-filter-tag">&#9660; Internal Users <span class="close">&times;</span></span>' +
+        '<input type="text" placeholder="Search..." style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);width:180px;">' +
+        '<span style="color:var(--text-muted);font-size:12px;margin-left:8px;">1-' + users.length + ' / ' + users.length + '</span>' +
+        '<div class="pos-nav-views" style="margin-left:8px;">' +
+            '<button class="active">&#9776;</button><button>&#9638;</button>' +
+        '</div>' +
+    '</div>' +
+    // Users table
+    '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
+        '<th style="width:30px;"><input type="checkbox"></th>' +
+        '<th>Name</th>' +
+        '<th>Login</th>' +
+        '<th>Role</th>' +
+        '<th style="width:120px;">Actions</th>' +
+    '</tr></thead><tbody>' +
+    users.map((u, i) => {
+        const c = colors[i % colors.length];
+        const initials = u.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 1);
+        return '<tr>' +
+            '<td><input type="checkbox"></td>' +
+            '<td><div style="display:flex;align-items:center;gap:8px;">' +
+                '<div style="width:28px;height:28px;border-radius:50%;background:' + c + ';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;">' + initials + '</div>' +
+                '<strong>' + escHtml(u.name) + '</strong>' +
+            '</div></td>' +
+            '<td style="color:var(--text-muted);">' + escHtml(u.email) + '</td>' +
+            '<td>' + '<span class="badge badge-' + (u.role === 'administrator' ? 'confirmed' : 'draft') + '">' + escHtml(u.role.charAt(0).toUpperCase() + u.role.slice(1)) + '</span></td>' +
+            '<td>' +
+                '<button class="btn btn-sm btn-outline" onclick="showEditUserModal(' + u.id + ',\'' + escHtml(u.name) + '\',\'' + escHtml(u.email) + '\',\'' + escHtml(u.role) + '\')">Edit</button> ' +
+                (u.id !== (currentUser ? currentUser.id : 0) ? '<button class="btn btn-sm" style="background:#e74c3c;color:#fff;" onclick="deleteUser(' + u.id + ')">Delete</button>' : '') +
+            '</td></tr>';
+    }).join('') +
+    '</tbody></table></div></div>';
+}
+
+function showNewUserModal() {
+    openModal('Invite New User',
+        '<form id="invite-form">' +
+        '<div class="form-group"><label>Email Address</label><input name="email" type="email" class="form-control" required placeholder="user@example.com"></div>' +
+        '<div class="form-group"><label>Role</label><select name="role" class="form-control">' +
+            '<option value="administrator">Administrator</option>' +
+            '<option value="user" selected>User</option>' +
+            '<option value="readonly">Read Only</option>' +
+        '</select></div>' +
+        '</form>',
+        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
+        '<button class="btn btn-primary" onclick="sendInvite()">Send Invitation</button>'
+    );
+}
+
+async function sendInvite() {
+    const data = getFormData('invite-form');
+    try {
+        await api('/api/users/invite', { method: 'POST', body: data });
+        closeModal(); toast('Invitation sent to ' + data.email);
+        navigate('manage-users');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+function showEditUserModal(id, name, email, role) {
+    openModal('Edit User: ' + name,
+        '<form id="edit-user-form">' +
+        '<div class="form-group"><label>Name</label><input name="name" class="form-control" value="' + escHtml(name) + '"></div>' +
+        '<div class="form-group"><label>Email</label><input name="email" class="form-control" value="' + escHtml(email) + '" readonly style="background:var(--bg);"></div>' +
+        '<div class="form-group"><label>Role</label><select name="role" class="form-control">' +
+            '<option value="administrator"' + (role === 'administrator' ? ' selected' : '') + '>Administrator</option>' +
+            '<option value="user"' + (role === 'user' ? ' selected' : '') + '>User</option>' +
+            '<option value="readonly"' + (role === 'readonly' ? ' selected' : '') + '>Read Only</option>' +
+        '</select></div>' +
+        '<div class="form-group"><label>New Password (leave blank to keep current)</label><input name="password" type="password" class="form-control" placeholder=""></div>' +
+        '</form>',
+        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
+        '<button class="btn btn-primary" onclick="saveUserEdit(' + id + ')">Save</button>'
+    );
+}
+
+async function saveUserEdit(id) {
+    const data = getFormData('edit-user-form');
+    if (!data.password) delete data.password;
+    delete data.email;
+    try {
+        await api('/api/users/' + id, { method: 'PUT', body: data });
+        closeModal(); toast('User updated');
+        navigate('manage-users');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function deleteUser(id) {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+    try {
+        await api('/api/users/' + id, { method: 'DELETE' });
+        toast('User deleted');
+        navigate('manage-users');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
 // ── Init ────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-    navigate('dashboard');
+    checkAuth();
 });
 
 document.getElementById('modal-overlay').addEventListener('click', (e) => {
