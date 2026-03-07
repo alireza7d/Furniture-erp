@@ -12,7 +12,7 @@ async function api(url, options = {}) {
     const opts = { headers: { 'Content-Type': 'application/json' }, ...options };
     if (opts.body && typeof opts.body === 'object') opts.body = JSON.stringify(opts.body);
     const res = await fetch(API + url, opts);
-    if (\!res.ok) {
+    if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: 'Request failed' }));
         throw new Error(err.detail || 'Request failed');
     }
@@ -222,7 +222,7 @@ async function updateLeadStage(id) {
 }
 
 async function deleteLead(id) {
-    if (\!confirm('Delete this lead?')) return;
+    if (!confirm('Delete this lead?')) return;
     await api('/api/crm/leads/' + id, { method: 'DELETE' });
     closeModal();
     toast('Lead deleted');
@@ -532,11 +532,11 @@ async function showInvoiceDetail(id) {
         '<table><thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' +
         (inv.lines || []).map(l => '<tr><td>' + escHtml(l.description) + '</td><td>' + l.quantity + '</td><td>' + fmt(l.unit_price) + '</td><td>' + fmt(l.subtotal) + '</td></tr>').join('') +
         '</tbody></table>' +
-        (inv.status \!== 'paid' ? '<hr class="divider"><h4 class="mb-2">Register Payment</h4>' +
+        (inv.status !== 'paid' ? '<hr class="divider"><h4 class="mb-2">Register Payment</h4>' +
             '<div class="form-row"><div class="form-group"><label>Amount</label><input type="number" id="pay-amount" class="form-control" value="' + (inv.total - inv.amount_paid).toFixed(2) + '"></div>' +
             '<div class="form-group"><label>Method</label><select id="pay-method" class="form-control"><option value="bank_transfer">Bank Transfer</option><option value="cash">Cash</option><option value="card">Card</option><option value="check">Check</option></select></div></div>' : ''),
         (inv.status === 'draft' ? '<button class="btn btn-accent" onclick="sendInvoice(' + id + ')">Send</button> ' : '') +
-        (inv.status \!== 'paid' ? '<button class="btn btn-success" onclick="payInvoice(' + id + ')">Pay</button> ' : '') +
+        (inv.status !== 'paid' ? '<button class="btn btn-success" onclick="payInvoice(' + id + ')">Pay</button> ' : '') +
         '<button class="btn btn-outline" onclick="closeModal()">Close</button>'
     );
 }
@@ -747,7 +747,7 @@ async function completeMO(id) { await api('/api/manufacturing/orders/' + id + '/
 
 async function showNewBOM() {
     const products = await api('/api/products');
-    const finishedOpts = products.filter(p => p.category \!== 'Raw Material').map(p => '<option value="' + p.id + '">' + escHtml(p.name) + '</option>').join('');
+    const finishedOpts = products.filter(p => p.category !== 'Raw Material').map(p => '<option value="' + p.id + '">' + escHtml(p.name) + '</option>').join('');
     const matOpts = products.map(p => '<option value="' + p.id + '">' + escHtml(p.name) + '</option>').join('');
     openModal('New Bill of Materials',
         '<form id="bom-form">' +
@@ -818,8 +818,8 @@ async function saveMO() {
     try {
         const data = getFormData('mo-form');
         data.bom_id = parseInt(data.bom_id);
-        if (\!data.planned_start) delete data.planned_start;
-        if (\!data.planned_end) delete data.planned_end;
+        if (!data.planned_start) delete data.planned_start;
+        if (!data.planned_end) delete data.planned_end;
         await api('/api/manufacturing/orders', { method: 'POST', body: data });
         closeModal(); toast('Manufacturing order created'); navigate('manufacturing');
     } catch (e) { toast(e.message, 'error'); }
@@ -907,7 +907,7 @@ async function showNewEmailCampaign() {
         '<div class="form-group"><label>Campaign Name</label><input name="name" class="form-control" required></div>' +
         '<div class="form-group"><label>Subject Line</label><input name="subject" class="form-control" required></div>' +
         '<div class="form-group"><label>Mailing List</label><select name="mailing_list_id" class="form-control">' + opts + '</select></div>' +
-        '<div class="form-group"><label>Email Body (HTML)</label><textarea name="body_html" class="form-control" rows="6" placeholder="<h1>Hello\!</h1><p>Your content here...</p>"></textarea></div>' +
+        '<div class="form-group"><label>Email Body (HTML)</label><textarea name="body_html" class="form-control" rows="6" placeholder="<h1>Hello!</h1><p>Your content here...</p>"></textarea></div>' +
         '</form>',
         '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
         '<button class="btn btn-primary" onclick="saveEmailCampaign()">Create Campaign</button>'
@@ -949,9 +949,9 @@ async function updateEmailCampaign(id) {
 }
 
 async function sendEmailCampaign(id) {
-    if (\!confirm('Send this email campaign to all subscribers?')) return;
+    if (!confirm('Send this email campaign to all subscribers?')) return;
     await api('/api/marketing/email/campaigns/' + id + '/send', { method: 'POST' });
-    toast('Campaign sent\!'); navigate('email-marketing');
+    toast('Campaign sent!'); navigate('email-marketing');
 }
 
 // ── SMS Marketing Module ────────────────────────────────────────────────────
@@ -1004,9 +1004,9 @@ async function saveSMSCampaign() {
 }
 
 async function sendSMSCampaign(id) {
-    if (\!confirm('Send this SMS campaign?')) return;
+    if (!confirm('Send this SMS campaign?')) return;
     await api('/api/marketing/sms/campaigns/' + id + '/send', { method: 'POST' });
-    toast('SMS campaign sent\!'); navigate('sms-marketing');
+    toast('SMS campaign sent!'); navigate('sms-marketing');
 }
 
 
@@ -1105,7 +1105,7 @@ async function showContactDetail(id) {
 }
 
 async function deleteContact(id) {
-    if (\!confirm('Delete this contact?')) return;
+    if (!confirm('Delete this contact?')) return;
     try {
         await api('/api/contacts/' + id, { method: 'DELETE' });
         closeModal(); toast('Contact deleted'); navigate('contacts');
@@ -1201,7 +1201,7 @@ async function showProductDetail(id) {
 }
 
 async function deleteProduct(id) {
-    if (\!confirm('Archive this product?')) return;
+    if (!confirm('Archive this product?')) return;
     await api('/api/products/' + id, { method: 'DELETE' });
     closeModal(); toast('Product archived'); navigate('products');
 }
