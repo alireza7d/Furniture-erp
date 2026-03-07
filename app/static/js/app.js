@@ -19,7 +19,7 @@ async function api(url, options = {}) {
     return res.json();
 }
 
-function fmt(n) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0); }
+function fmt(n) { return new Intl.NumberFormat('en-OM', { style: 'currency', currency: 'OMR' }).format(n || 0); }
 function fmtN(n) { return new Intl.NumberFormat('en-US').format(n || 0); }
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
