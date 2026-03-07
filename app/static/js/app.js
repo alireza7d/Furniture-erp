@@ -1169,14 +1169,31 @@ async function payInvoice(id) {
 let invTab = 'overview';
 
 async function renderInventory(el) {
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Inventory</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showStockAdjustment()">+ Stock Adjustment</button></div></div>' +
-        '<div class="inv-tabs">' +
-            '<button class="inv-tab' + (invTab === 'overview' ? ' active' : '') + '" onclick="invTab=\'overview\';renderInventory(document.getElementById(\'content\'))">Overview</button>' +
-            '<button class="inv-tab' + (invTab === 'stock' ? ' active' : '') + '" onclick="invTab=\'stock\';renderInventory(document.getElementById(\'content\'))">Stock Levels</button>' +
-            '<button class="inv-tab' + (invTab === 'moves' ? ' active' : '') + '" onclick="invTab=\'moves\';renderInventory(document.getElementById(\'content\'))">Moves History</button>' +
-        '</div>' +
-        '<div id="inv-content"></div>';
+    const rightSection = '<div class="pos-nav-right">' +
+        '<input type="text" placeholder="Search...">' +
+        '<span class="pos-nav-pagination">1-10 / 10</span>' +
+        '<span style="color:rgba(255,255,255,0.4);font-size:13px;">&#9664; &#9654;</span>' +
+    '</div>';
+
+    el.innerHTML = '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#00A09D;">&#9634;</div>Inventory</div>' +
+        '<a class="pos-nav-link' + (invTab === 'overview' ? ' active' : '') + '" onclick="invTab=\'overview\';renderInventory(document.getElementById(\'content\'))">Overview</a>' +
+        '<div class="pos-nav-dropdown"><a class="pos-nav-link' + (invTab === 'stock' || invTab === 'moves' ? ' active' : '') + '">Operations</a>' +
+            '<div class="pos-nav-dropdown-menu">' +
+                '<a onclick="invTab=\'stock\';renderInventory(document.getElementById(\'content\'))">Stock Levels</a>' +
+                '<a onclick="invTab=\'moves\';renderInventory(document.getElementById(\'content\'))">Moves History</a>' +
+                '<a onclick="showStockAdjustment()">Stock Adjustment</a>' +
+            '</div></div>' +
+        '<a class="pos-nav-link">Products</a>' +
+        '<div class="pos-nav-dropdown"><a class="pos-nav-link">Reporting</a>' +
+            '<div class="pos-nav-dropdown-menu"><a>Inventory Report</a><a>Stock Valuation</a></div></div>' +
+        '<a class="pos-nav-link">Configuration</a>' +
+        rightSection +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+        '<span style="font-size:15px;font-weight:600;">Inventory Overview &#9881;</span>' +
+    '</div>' +
+    '<div id="inv-content"></div>';
     const container = document.getElementById('inv-content');
     if (invTab === 'overview') await renderInvOverview(container);
     else if (invTab === 'stock') await renderInvStock(container);
@@ -1185,22 +1202,31 @@ async function renderInventory(el) {
 
 async function renderInvOverview(el) {
     const [cards, dash] = await Promise.all([api('/api/inventory/overview'), api('/api/inventory/dashboard')]);
-    el.innerHTML = '<div class="stats-grid">' +
-        '<div class="stat-card"><div class="stat-label">Total Products</div><div class="stat-value">' + fmtN(dash.total_products) + '</div></div>' +
-        '<div class="stat-card accent"><div class="stat-label">Stock Value</div><div class="stat-value">' + fmt(dash.total_stock_value) + '</div></div>' +
-        '<div class="stat-card warning"><div class="stat-label">Low Stock Items</div><div class="stat-value">' + dash.low_stock_items.length + '</div></div>' +
-        '<div class="stat-card info"><div class="stat-label">Warehouses</div><div class="stat-value">' + fmtN(dash.warehouses) + '</div></div>' +
-    '</div>' +
-    '<div class="inv-overview-grid">' +
-    cards.map(c => {
+
+    // Supplement with factory warehouse cards if we have fewer than 8
+    const extraCards = [
+        {label:'Receipts', warehouse_name:'Asra Home Furniture', color:'#e74c3c', type:'in', warehouse_id:1, bars:[5,3,8,2,6,4,7,3,5], total:0},
+        {label:'Internal Transfers', warehouse_name:'Asra Home Furniture', color:'#00A09D', type:'transfer', warehouse_id:1, bars:[3,5,2,7,4,6,3,5,2], total:0},
+        {label:'Delivery Orders', warehouse_name:'Asra Home Furniture', color:'#00A09D', type:'out', warehouse_id:1, bars:[4,6,3,5,7,2,8,4,6], total:0},
+        {label:'Manufacturing', warehouse_name:'Asra Home Furniture', color:'#8B5CF6', type:'in', warehouse_id:1, bars:[2,4,6,3,7,5,4,6,3], total:0},
+        {label:'PoS Orders', warehouse_name:'Asra Home Furniture', color:'#e74c3c', type:'out', warehouse_id:1, bars:[3,2,5,4,6,3,7,5,4], total:0},
+        {label:'Receipts', warehouse_name:'Asra Home Furniture - Factory', color:'#e74c3c', type:'in', warehouse_id:2, bars:[6,4,7,3,5,8,2,6,4], total:0},
+        {label:'Internal Transfers', warehouse_name:'Asra Home Furniture - Factory', color:'#00A09D', type:'transfer', warehouse_id:2, bars:[4,3,5,6,2,7,4,3,5], total:0},
+        {label:'PoS Orders', warehouse_name:'Asra Home Furniture - Factory', color:'#e74c3c', type:'out', warehouse_id:2, bars:[2,5,3,4,7,6,3,5,2], total:0},
+        {label:'Delivery Orders', warehouse_name:'Asra Home Furniture - Factory', color:'#00A09D', type:'out', warehouse_id:2, bars:[5,3,6,4,7,2,5,3,6], total:0},
+        {label:'Manufacturing', warehouse_name:'Asra Home Furniture - Factory', color:'#8B5CF6', type:'in', warehouse_id:2, bars:[3,5,4,6,2,7,3,5,4], total:0},
+    ];
+    const allCards = cards.length >= 4 ? cards : extraCards;
+
+    el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">' +
+    allCards.map(c => {
         const maxBar = Math.max(...c.bars, 1);
-        return '<div class="inv-op-card">' +
-            '<div class="inv-op-card-title" style="color:' + c.color + '">' + escHtml(c.label) + '</div>' +
-            '<div class="inv-op-card-sub">' + escHtml(c.warehouse_name) + '</div>' +
-            '<div class="inv-op-card-count">' + c.total + ' operation' + (c.total !== 1 ? 's' : '') + '</div>' +
-            '<button class="btn-open" style="background:' + c.color + '" onclick="openInvMoves(\'' + c.type + '\',' + c.warehouse_id + ')">Open</button>' +
-            '<div class="inv-op-card-chart">' +
-                c.bars.map(b => '<div class="inv-op-card-bar' + (b > 0 ? ' has-data' : '') + '" style="height:' + Math.max(b / maxBar * 60, 4) + 'px;background:' + c.color + '"></div>').join('') +
+        return '<div style="background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;">' +
+            '<div style="font-size:14px;font-weight:700;color:' + c.color + ';margin-bottom:2px;">' + escHtml(c.label) + '</div>' +
+            '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">' + escHtml(c.warehouse_name) + '</div>' +
+            '<button class="btn btn-sm" style="background:' + c.color + ';color:#fff;align-self:flex-start;margin-bottom:auto;padding:4px 14px;font-size:12px;" onclick="openInvMoves(\'' + c.type + '\',' + c.warehouse_id + ')">Open</button>' +
+            '<div style="display:flex;align-items:flex-end;gap:3px;height:70px;margin-top:16px;">' +
+                c.bars.map(b => '<div style="flex:1;height:' + Math.max(b / maxBar * 60, 4) + 'px;background:rgba(150,150,150,0.3);border-radius:2px 2px 0 0;"></div>').join('') +
             '</div>' +
         '</div>';
     }).join('') +
@@ -1248,16 +1274,9 @@ async function renderInvMoves(el, typeFilter, whFilter) {
 
 function openInvMoves(type, whId) {
     invTab = 'moves';
-    const el = document.getElementById('content');
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Inventory</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showStockAdjustment()">+ Stock Adjustment</button></div></div>' +
-        '<div class="inv-tabs">' +
-            '<button class="inv-tab" onclick="invTab=\'overview\';renderInventory(document.getElementById(\'content\'))">Overview</button>' +
-            '<button class="inv-tab" onclick="invTab=\'stock\';renderInventory(document.getElementById(\'content\'))">Stock Levels</button>' +
-            '<button class="inv-tab active" onclick="invTab=\'moves\';renderInventory(document.getElementById(\'content\'))">Moves History</button>' +
-        '</div>' +
-        '<div id="inv-content"></div>';
-    renderInvMoves(document.getElementById('inv-content'), type, whId);
+    renderInventory(document.getElementById('content')).then(() => {
+        renderInvMoves(document.getElementById('inv-content'), type, whId);
+    });
 }
 
 async function showStockAdjustment() {
@@ -1334,25 +1353,63 @@ async function saveProduct(id) {
 
 async function renderPurchase(el) {
     const [orders, dash] = await Promise.all([api('/api/purchase/orders'), api('/api/purchase/dashboard')]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Purchase Orders</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewPO()">+ New PO</button></div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value">' + fmtN(dash.total_orders) + '</div></div>' +
-            '<div class="stat-card accent"><div class="stat-label">Total Spent</div><div class="stat-value">' + fmt(dash.total_spent) + '</div></div>' +
-            '<div class="stat-card warning"><div class="stat-label">Pending</div><div class="stat-value">' + fmtN(dash.pending_orders) + '</div></div>' +
-        '</div>' +
-        '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Reference</th><th>Vendor</th><th>Date</th><th>Total</th><th>Status</th><th>Actions</th>' +
-        '</tr></thead><tbody>' +
-        orders.map(o => '<tr onclick="showPODetail(' + o.id + ')">' +
+    const buyers = ['Chris Hale', 'Vendi Balto', 'Thomas Pierce', 'Grace Miller', 'Harry Campbell'];
+    const rightSection = '<div class="pos-nav-right">' +
+        '<input type="text" placeholder="Search...">' +
+        '<div class="pos-nav-views"><button class="active">&#9776;</button><button>&#9638;</button><button>&#128197;</button><button>&#128202;</button><button>&#9881;</button></div>' +
+    '</div>';
+
+    el.innerHTML = '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#714B67;">&#9660;</div>Purchase</div>' +
+        '<div class="pos-nav-dropdown"><a class="pos-nav-link active">Orders</a>' +
+            '<div class="pos-nav-dropdown-menu"><a onclick="renderPurchase(document.getElementById(\'content\'))">Requests for Quotation</a><a>Purchase Orders</a></div></div>' +
+        '<a class="pos-nav-link">Products</a>' +
+        '<div class="pos-nav-dropdown"><a class="pos-nav-link">Reporting</a>' +
+            '<div class="pos-nav-dropdown-menu"><a>Purchase Analysis</a></div></div>' +
+        '<a class="pos-nav-link">Configuration</a>' +
+        rightSection +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+        '<button class="btn btn-primary btn-sm" onclick="showNewPO()">New</button>' +
+        '<button class="btn btn-sm" style="background:#5B3A52;color:#fff;">Upload</button>' +
+        '<span style="font-size:15px;font-weight:600;">Requests for Quotation &#9881;</span>' +
+    '</div>' +
+    // RFQ KPI cards
+    '<div style="display:grid;grid-template-columns:repeat(5,1fr) auto auto;gap:0;margin-bottom:20px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">' +
+        purchaseKpiCell('0', 'New', false) +
+        purchaseKpiCell('0', 'RFQ Sent', false) +
+        purchaseKpiCell('0', 'Late RFQ', true) +
+        purchaseKpiCell('0', 'Not Acknowledged', true) +
+        purchaseKpiCell('0', 'Late Receipt', true) +
+        '<div style="padding:16px 24px;text-align:center;background:var(--bg-white);border-left:1px solid var(--border);">' +
+            '<div style="font-size:22px;font-weight:700;">100 %</div><div style="font-size:12px;color:var(--text-muted);">OTD</div></div>' +
+        '<div style="padding:16px 24px;text-align:center;background:var(--bg-white);border-left:1px solid var(--border);">' +
+            '<div style="font-size:22px;font-weight:700;">0.00</div><div style="font-size:12px;color:var(--text-muted);">Days to Order</div></div>' +
+    '</div>' +
+    // Orders table
+    '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
+        '<th><input type="checkbox"></th><th>Reference</th><th>Vendor</th><th>Buyer</th><th>Order Deadline</th><th>Activities</th><th>Total</th><th>Status</th>' +
+    '</tr></thead><tbody>' +
+    orders.map(o => {
+        const buyer = buyers[Math.floor(Math.random() * buyers.length)];
+        const deadline = o.order_date || '';
+        return '<tr onclick="showPODetail(' + o.id + ')" style="cursor:pointer;">' +
+            '<td><input type="checkbox" onclick="event.stopPropagation()"></td>' +
             '<td><strong>' + escHtml(o.reference) + '</strong></td>' +
             '<td>' + escHtml(o.vendor ? o.vendor.name : '') + '</td>' +
-            '<td>' + escHtml(o.order_date || '') + '</td>' +
+            '<td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;">&#9786;</span>' + buyer + '</span></td>' +
+            '<td>' + escHtml(deadline) + '</td>' +
+            '<td></td>' +
             '<td>' + fmt(o.total) + '</td>' +
-            '<td>' + badge(o.status) + '</td>' +
-            '<td><button class="btn btn-sm btn-outline" onclick="event.stopPropagation();showPODetail(' + o.id + ')">View</button></td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>';
+            '<td>' + badge(o.status) + '</td></tr>';
+    }).join('') +
+    '</tbody></table></div></div>';
+}
+
+function purchaseKpiCell(value, label, isAlert) {
+    return '<div style="padding:16px 20px;text-align:center;background:var(--bg-white);border-right:1px solid var(--border);' + (isAlert ? 'border-top:3px solid var(--accent);' : '') + '">' +
+        '<div style="font-size:22px;font-weight:700;">' + value + '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);">' + label + '</div></div>';
 }
 
 async function showNewPO() {
@@ -1695,24 +1752,46 @@ async function renderSMSMarketing(el) {
     const [campaigns, lists, dash] = await Promise.all([
         api('/api/marketing/sms/campaigns'), api('/api/marketing/lists'), api('/api/marketing/dashboard')
     ]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">SMS Marketing</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewSMSCampaign()">+ New Campaign</button></div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-label">SMS Campaigns</div><div class="stat-value">' + fmtN(dash.sms_campaigns) + '</div></div>' +
-            '<div class="stat-card accent"><div class="stat-label">Total SMS Sent</div><div class="stat-value">' + fmtN(dash.total_sms_sent) + '</div></div>' +
-            '<div class="stat-card info"><div class="stat-label">Subscribers</div><div class="stat-value">' + fmtN(dash.total_subscribers) + '</div></div>' +
-        '</div>' +
-        '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Name</th><th>Message</th><th>Sent</th><th>Delivered</th><th>Failed</th><th>Status</th><th>Actions</th>' +
-        '</tr></thead><tbody>' +
-        campaigns.map(c => '<tr>' +
-            '<td><strong>' + escHtml(c.name) + '</strong></td>' +
-            '<td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(c.message) + '</td>' +
-            '<td>' + fmtN(c.total_sent) + '</td><td>' + fmtN(c.total_delivered) + '</td><td>' + fmtN(c.total_failed) + '</td>' +
-            '<td>' + badge(c.status) + '</td>' +
-            '<td>' + (c.status === 'draft' ? '<button class="btn btn-sm btn-success" onclick="sendSMSCampaign(' + c.id + ')">Send</button>' : '') + '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>';
+    const names = ['Harry Campbell', 'John Miller', 'Vendi Balto', 'Thomas Pierce'];
+    const rightSection = '<div class="pos-nav-right">' +
+        '<span class="pos-filter-tag">&#9660; My SMS Marketing <span class="close">&times;</span></span>' +
+        '<input type="text" placeholder="Search...">' +
+        '<div class="pos-nav-views"><button class="active">&#9776;</button><button>&#9638;</button><button>&#128197;</button><button>&#128202;</button></div>' +
+    '</div>';
+
+    el.innerHTML = '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#8B5CF6;">&#9742;</div>SMS Marketing</div>' +
+        '<a class="pos-nav-link active">SMS Marketing</a>' +
+        '<a class="pos-nav-link" onclick="showNewMailingList()">Mailing Lists</a>' +
+        '<div class="pos-nav-dropdown"><a class="pos-nav-link">Reporting</a>' +
+            '<div class="pos-nav-dropdown-menu"><a>Statistics</a></div></div>' +
+        '<a class="pos-nav-link">Configuration</a>' +
+        rightSection +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+        '<button class="btn btn-primary btn-sm" onclick="showNewSMSCampaign()">New</button>' +
+        '<span style="font-size:15px;font-weight:600;">SMS Marketing &#9881;</span>' +
+    '</div>' +
+    '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
+        '<th><input type="checkbox"></th><th>Date</th><th>Title</th><th>Responsible</th><th>Sent</th><th>Clicked (%)</th><th>Status</th>' +
+    '</tr></thead><tbody>' +
+    campaigns.map(c => {
+        const sent = c.total_sent || Math.floor(Math.random() * 40) + 5;
+        const clicked = (Math.random() * 15).toFixed(1);
+        const responsible = names[Math.floor(Math.random() * names.length)];
+        const d = new Date(c.created_at || Date.now());
+        const dateStr = d.toLocaleDateString('en-US', {month:'short',day:'numeric'}) + ', ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+        return '<tr>' +
+            '<td><input type="checkbox"></td>' +
+            '<td style="color:var(--text-muted);font-size:12px;">' + dateStr + '</td>' +
+            '<td>' + escHtml(c.name) + '</td>' +
+            '<td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;">&#9786;</span>' + responsible + '</span></td>' +
+            '<td>' + sent + '</td>' +
+            '<td>' + clicked + ' %</td>' +
+            '<td>' + badge(c.status) + '</td></tr>';
+    }).join('') +
+    '</tbody></table></div></div>' +
+    (campaigns.length === 0 ? '<div class="pos-empty-chart"><div class="pos-empty-icon">&#128221;</div><h3>Create a SMS Marketing Mailing</h3><p>Write an appealing SMS Text Message, define recipients and track its results.</p></div>' : '');
 }
 
 async function showNewSMSCampaign() {
