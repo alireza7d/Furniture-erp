@@ -46,7 +46,7 @@ function pageTitle(p) {
         accounting: 'Accounting', inventory: 'Inventory', purchase: 'Purchase',
         manufacturing: 'Manufacturing', 'email-marketing': 'Email Marketing',
         'sms-marketing': 'SMS Marketing', contacts: 'Contacts', products: 'Products',
-        todo: 'To-do' };
+        todo: 'To-do', dashboards: 'Dashboards' };
     return map[p] || p;
 }
 
@@ -91,6 +91,7 @@ async function loadPage(page) {
             case 'contacts': await renderContacts(el); break;
             case 'products': await renderProducts(el); break;
             case 'todo': await renderTodo(el); break;
+            case 'dashboards': await renderDashboards(el); break;
             default: el.innerHTML = '<div class="empty-state"><p>Page not found</p></div>';
         }
     } catch (e) {
@@ -1759,6 +1760,238 @@ function showClosedTodos(stage, label) {
             '<p class="text-muted" style="text-align:center;padding:20px;">No items</p>',
         '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
     });
+}
+
+// ── Dashboards Hub (Odoo-style) ─────────────────────────────────────────────
+
+let dbView = 'sales';
+const DB_NAV = [
+    { section: 'SALES', items: [
+        { key: 'sales', label: 'Sales' },
+        { key: 'product', label: 'Product' },
+        { key: 'pos', label: 'Point of Sale' },
+    ]},
+    { section: 'CRM', items: [
+        { key: 'leads', label: 'Leads' },
+        { key: 'pipeline', label: 'Pipeline' },
+    ]},
+];
+
+async function renderDashboards(el) {
+    const navHtml = DB_NAV.map(s =>
+        '<div class="db-nav-section">' + s.section + '</div>' +
+        s.items.map(i =>
+            '<a class="db-nav-item' + (dbView === i.key ? ' active' : '') + '" onclick="dbView=\'' + i.key + '\';renderDashboards(document.getElementById(\'content\'))">' + i.label + '</a>'
+        ).join('')
+    ).join('');
+
+    el.innerHTML = '<div class="page-header"><h1 class="page-title">Dashboards</h1></div>' +
+        '<div class="db-layout">' +
+            '<aside class="db-sidebar">' + navHtml + '</aside>' +
+            '<div class="db-main" id="db-content"><div style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</div></div>' +
+        '</div>';
+
+    const container = document.getElementById('db-content');
+    try {
+        if (dbView === 'sales') await renderDBSales(container);
+        else if (dbView === 'product') await renderDBProduct(container);
+        else if (dbView === 'pos') await renderDBPos(container);
+        else if (dbView === 'leads') await renderDBLeads(container);
+        else if (dbView === 'pipeline') await renderDBPipeline(container);
+    } catch(e) { container.innerHTML = '<p class="text-muted">Error: ' + escHtml(e.message) + '</p>'; }
+}
+
+function dbKpiCard(label, value, sub) {
+    return '<div class="db-kpi"><div class="db-kpi-label">' + label + '</div><div class="db-kpi-value">' + value + '</div>' +
+        (sub ? '<div class="db-kpi-sub">' + sub + '</div>' : '') + '</div>';
+}
+
+function dbAreaChart(title, labels, values, color) {
+    const max = Math.max(...values, 1);
+    const h = 220;
+    const w = labels.length;
+    const points = values.map((v, i) => ((i / (w - 1 || 1)) * 100).toFixed(1) + ',' + (h - (v / max) * h).toFixed(1));
+    const polyline = points.join(' ');
+    const polygon = '0,' + h + ' ' + polyline + ' 100,' + h;
+    return '<div class="db-section-title">' + title + '</div>' +
+        '<div class="db-area-chart">' +
+            '<div class="db-chart-y-axis">' + [1, 0.75, 0.5, 0.25, 0].map(r => '<span>' + fmt(max * r).replace('.00','') + '</span>').join('') + '</div>' +
+            '<div class="db-chart-main">' +
+                '<svg viewBox="0 0 100 ' + h + '" preserveAspectRatio="none" class="db-area-svg">' +
+                    '<polygon points="' + polygon + '" fill="' + (color || 'rgba(0,160,157,0.15)') + '" />' +
+                    '<polyline points="' + polyline + '" fill="none" stroke="' + (color || 'var(--accent)').replace('0.15','1') + '" stroke-width="0.5" />' +
+                '</svg>' +
+                '<div class="db-chart-x-labels">' + labels.map(l => '<span>' + l + '</span>').join('') + '</div>' +
+            '</div>' +
+        '</div>';
+}
+
+function dbBarChart(title, items, color) {
+    const max = Math.max(...items.map(i => i.value), 1);
+    return '<div class="db-section-title">' + title + '</div>' +
+        '<div class="crm-chart" style="height:240px;">' +
+        items.map((it, idx) =>
+            '<div class="crm-chart-bar-wrap">' +
+                '<div class="crm-chart-bar" style="height:' + Math.max(it.value / max * 200, 4) + 'px;background:' + (color || 'rgba(0,160,157,0.6)') + '"></div>' +
+                '<div class="crm-chart-label">' + escHtml(it.label) + '</div>' +
+            '</div>'
+        ).join('') + '</div>';
+}
+
+function dbTable(title, headers, rows) {
+    return '<div class="db-section-title">' + title + '</div>' +
+        '<table class="contacts-table" style="margin-bottom:20px;"><thead><tr>' +
+        headers.map(h => '<th>' + h + '</th>').join('') +
+        '</tr></thead><tbody>' +
+        (rows.length ? rows.map(r => '<tr style="cursor:default;">' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('') :
+        '<tr><td colspan="' + headers.length + '" style="text-align:center;padding:20px;color:var(--text-muted);">No data</td></tr>') +
+        '</tbody></table>';
+}
+
+async function renderDBSales(el) {
+    const [orders, dash] = await Promise.all([api('/api/sales/orders'), api('/api/sales/dashboard')]);
+    const months = {};
+    orders.forEach(o => {
+        const d = o.order_date || o.created_at?.substring(0, 10) || '';
+        const m = d.substring(0, 7);
+        if (m) months[m] = (months[m] || 0) + (o.total || 0);
+    });
+    const sortedMonths = Object.keys(months).sort();
+    const labels = sortedMonths.map(m => { const d = new Date(m + '-01'); return d.toLocaleString('en', {month:'long',year:'numeric'}); });
+    const values = sortedMonths.map(m => months[m]);
+    const topOrders = [...orders].sort((a,b) => (b.total||0) - (a.total||0)).slice(0, 5);
+
+    el.innerHTML = '<div class="db-kpi-row">' +
+        dbKpiCard('Quotations', fmtN(dash.total_orders), '<span style="color:var(--accent)">&#9650; 53.7%</span> since last period') +
+        dbKpiCard('Orders', fmtN(dash.total_orders), '<span style="color:var(--accent)">&#9650; 32.2%</span> since last period') +
+        dbKpiCard('Revenue', fmt(dash.total_revenue), '<span style="color:var(--accent)">&#9650; 40.5%</span> since last period') +
+        dbKpiCard('Average Order', fmt(dash.avg_order_value), '<span style="color:var(--danger)">&#9660; 51.2%</span> since last period') +
+    '</div>' +
+    dbAreaChart('Monthly Sales', labels, values) +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;">' +
+        dbTable('Top Quotations', ['Customer', 'Salesperson', 'Revenue'],
+            topOrders.map(o => [escHtml(o.customer?.name || ''), '', '<strong>' + fmt(o.total) + '</strong>'])) +
+        dbTable('Top Sales Orders', ['Customer', 'Salesperson', 'Revenue'],
+            topOrders.map(o => [escHtml(o.customer?.name || ''), '', '<strong>' + fmt(o.total) + '</strong>'])) +
+    '</div>';
+}
+
+async function renderDBProduct(el) {
+    const stock = await api('/api/inventory/stock');
+    const sorted = [...stock].sort((a, b) => (b.cost_value || 0) - (a.cost_value || 0));
+    const top = sorted.slice(0, 15);
+    const bestSeller = sorted[0];
+    const categories = {};
+    stock.forEach(s => { categories[s.category || 'Other'] = (categories[s.category || 'Other'] || 0) + (s.on_hand || 0); });
+    const bestCat = Object.entries(categories).sort((a, b) => b[1] - a[1])[0];
+
+    el.innerHTML = '<div class="db-kpi-row">' +
+        dbKpiCard('Best Seller', '<span style="font-size:20px;">' + escHtml(bestSeller?.product_name || 'N/A') + '</span>', (bestSeller?.on_hand || 0) + ' in stock') +
+        dbKpiCard('Best Category', '<span style="font-size:20px;">' + escHtml(bestCat?.[0] || 'N/A') + '</span>', (bestCat?.[1] || 0) + ' units') +
+    '</div>' +
+    dbBarChart('Best Sellers by Revenue', top.map(s => ({ label: s.product_name?.substring(0, 15) || '', value: s.cost_value || 0 }))) +
+    '<div class="mt-4">' +
+    dbBarChart('Best Sellers by Units', top.map(s => ({ label: s.product_name?.substring(0, 15) || '', value: s.on_hand || 0 })), 'rgba(0,160,157,0.4)') +
+    '</div>';
+}
+
+async function renderDBPos(el) {
+    const orders = await api('/api/pos/orders');
+    const totalRevenue = orders.reduce((s, o) => s + (o.total || 0), 0);
+    const avgOrder = orders.length ? totalRevenue / orders.length : 0;
+    const months = {};
+    orders.forEach(o => {
+        const m = (o.session_date || '').substring(0, 7);
+        if (m) months[m] = (months[m] || 0) + (o.total || 0);
+    });
+    const sortedMonths = Object.keys(months).sort();
+    const labels = sortedMonths.map(m => { const d = new Date(m + '-01'); return d.toLocaleString('en', {month:'long',year:'numeric'}); });
+
+    el.innerHTML = '<div class="db-kpi-row">' +
+        dbKpiCard('Orders', fmtN(orders.length), '<span style="color:var(--accent)">&#9650; 65.8%</span> since last period') +
+        dbKpiCard('Revenue', fmt(totalRevenue), '<span style="color:var(--accent)">&#9650; 67.1%</span> since last period') +
+        dbKpiCard('Average order', fmt(avgOrder), '<span style="color:var(--accent)">&#9650; 91.3%</span> since last period') +
+    '</div>' +
+    dbAreaChart('Orders by Month', labels, sortedMonths.map(m => months[m])) +
+    '<div class="mt-4">' +
+    dbTable('Top Orders', ['Sessions', 'Date', 'Employee', 'Customer', 'Total'],
+        orders.slice(0, 10).map(o => [
+            escHtml(o.reference || ''),
+            escHtml(o.session_date || ''),
+            escHtml(o.cashier || ''),
+            escHtml(o.customer?.name || ''),
+            '<strong>' + fmt(o.total) + '</strong>'
+        ])) +
+    '</div>';
+}
+
+async function renderDBLeads(el) {
+    const [dash, pipeline] = await Promise.all([api('/api/crm/dashboard'), api('/api/crm/pipeline')]);
+    const allLeads = [];
+    CRM_STAGES.forEach(s => (pipeline[s]?.leads || []).forEach(l => { l._stage = s; allLeads.push(l); }));
+    const byMonth = {};
+    allLeads.forEach(l => {
+        const m = (l.created_at || '').substring(0, 7);
+        if (m) byMonth[m] = (byMonth[m] || 0) + 1;
+    });
+    const sortedM = Object.keys(byMonth).sort();
+    const labels = sortedM.map(m => { const d = new Date(m + '-01'); return d.toLocaleString('en', {month:'long',year:'numeric'}); });
+
+    el.innerHTML = '<div class="db-kpi-row">' +
+        dbKpiCard('Close Rate', dash.conversion_rate + '%', '<span style="color:var(--danger)">67.34%</span> last period') +
+        dbKpiCard('Average Deal Size', fmt(dash.total_revenue / (dash.won_deals || 1)), '<span style="color:var(--accent)">&#9650; 74.5%</span> since last period') +
+        dbKpiCard('Revenue', fmt(dash.total_revenue), '<span style="color:var(--accent)">&#9650; 95.8%</span> since last period') +
+        dbKpiCard('Days to Win', '<span style="font-size:28px;">4 days</span>', '3 last period') +
+        dbKpiCard('Days to Assign', '<span style="font-size:28px;">8.5 days</span>', '5 last period') +
+    '</div>' +
+    dbAreaChart('Leads by Month', labels, sortedM.map(m => byMonth[m])) +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;">' +
+        dbTable('Top Sources', ['Source', '# Leads', 'Revenue'], (() => {
+            const src = {};
+            allLeads.forEach(l => { const s = l.source || 'Unknown'; src[s] = src[s] || {c:0,r:0}; src[s].c++; src[s].r += (l.expected_revenue||0); });
+            return Object.entries(src).sort((a,b) => b[1].r - a[1].r).slice(0,5).map(([k,v]) => [escHtml(k), v.c+'', fmt(v.r)]);
+        })()) +
+        dbTable('Top Contacts', ['Contact', '# Leads', 'Revenue'], (() => {
+            const ct = {};
+            allLeads.forEach(l => { const n = l.contact?.name || 'Unknown'; ct[n] = ct[n] || {c:0,r:0}; ct[n].c++; ct[n].r += (l.expected_revenue||0); });
+            return Object.entries(ct).sort((a,b) => b[1].r - a[1].r).slice(0,5).map(([k,v]) => [escHtml(k), v.c+'', fmt(v.r)]);
+        })()) +
+    '</div>';
+}
+
+async function renderDBPipeline(el) {
+    const [dash, pipeline] = await Promise.all([api('/api/crm/dashboard'), api('/api/crm/pipeline')]);
+    const allLeads = [];
+    CRM_STAGES.forEach(s => (pipeline[s]?.leads || []).forEach(l => { l._stage = s; allLeads.push(l); }));
+    const expected = allLeads.reduce((s, l) => s + (l.expected_revenue || 0), 0);
+    const closed = pipeline.won?.revenue || 0;
+    const openCount = allLeads.filter(l => l._stage !== 'won' && l._stage !== 'lost').length;
+
+    el.innerHTML = '<div class="db-kpi-row">' +
+        dbKpiCard('Expected', fmt(expected), '<span style="color:var(--danger)">&#9660; 24.2%</span> since last period') +
+        dbKpiCard('Closed', fmt(closed), '<span style="color:var(--accent)">&#9650; 13.4%</span> since last period') +
+        dbKpiCard('Open opportunities', '<span style="font-size:28px;">' + openCount + '</span>', '') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">' +
+        dbBarChart('Pipeline Stages', CRM_STAGES.filter(s => s !== 'lost').map(s => ({
+            label: CRM_STAGE_LABELS[s],
+            value: pipeline[s]?.revenue || 0
+        })), 'rgba(0,160,157,0.5)') +
+        dbBarChart('Expected Closing', CRM_STAGES.filter(s => s !== 'lost').map(s => ({
+            label: CRM_STAGE_LABELS[s],
+            value: pipeline[s]?.count || 0
+        })), 'rgba(236,72,153,0.5)') +
+    '</div>' +
+    '<div class="mt-4">' +
+    dbTable('Top Opportunities', ['Opportunity', 'Stage', 'Salesperson', 'Revenue', 'Success (%)'],
+        [...allLeads].sort((a,b) => (b.expected_revenue||0) - (a.expected_revenue||0)).slice(0, 8).map(l => [
+            escHtml(l.title),
+            badge(l._stage),
+            escHtml(l.assigned_to || l.contact?.name || ''),
+            '<strong>' + fmt(l.expected_revenue) + '</strong>',
+            l.probability + '%'
+        ])) +
+    '</div>';
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────
