@@ -839,6 +839,297 @@ select.form-control {
     .stats-grid { grid-template-columns: 1fr 1fr; }
 }
 
+/* ── POS Module Nav ─────────────────────────────────────────────────────── */
+
+.pos-module-nav {
+    display: flex;
+    align-items: center;
+    background: var(--primary-dark);
+    padding: 0 16px;
+    gap: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin: -20px -24px 20px -24px;
+}
+
+.pos-module-nav .pos-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px 10px 4px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.pos-module-nav .pos-nav-brand .pos-brand-icon {
+    width: 22px;
+    height: 22px;
+    background: #e74c3c;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #fff;
+}
+
+.pos-module-nav a, .pos-module-nav .pos-nav-link {
+    padding: 10px 14px;
+    color: rgba(255,255,255,0.75);
+    text-decoration: none;
+    font-size: 13px;
+    cursor: pointer;
+    transition: color 0.15s;
+    white-space: nowrap;
+}
+
+.pos-module-nav a:hover, .pos-module-nav .pos-nav-link:hover {
+    color: #fff;
+}
+
+.pos-module-nav a.active, .pos-module-nav .pos-nav-link.active {
+    color: #fff;
+    background: rgba(255,255,255,0.12);
+    border-radius: 4px;
+}
+
+.pos-nav-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.pos-nav-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    min-width: 180px;
+    z-index: 50;
+    padding: 4px 0;
+}
+
+.pos-nav-dropdown:hover .pos-nav-dropdown-menu,
+.pos-nav-dropdown.open .pos-nav-dropdown-menu {
+    display: block;
+}
+
+.pos-nav-dropdown-menu a {
+    display: block;
+    padding: 8px 16px;
+    color: var(--text);
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.pos-nav-dropdown-menu a:hover {
+    background: var(--bg);
+    color: var(--primary);
+}
+
+.pos-module-nav .pos-nav-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pos-module-nav .pos-nav-right input {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    padding: 5px 12px;
+    color: #fff;
+    font-size: 13px;
+    width: 200px;
+}
+
+.pos-module-nav .pos-nav-right input::placeholder {
+    color: rgba(255,255,255,0.5);
+}
+
+.pos-module-nav .pos-nav-pagination {
+    color: rgba(255,255,255,0.6);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.pos-module-nav .pos-nav-views {
+    display: flex;
+    gap: 2px;
+}
+
+.pos-module-nav .pos-nav-views button {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.6);
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.pos-module-nav .pos-nav-views button.active {
+    background: rgba(255,255,255,0.25);
+    color: #fff;
+}
+
+/* POS Shop Card */
+.pos-shop-card {
+    background: #1E1E2E;
+    border: 1px solid #333;
+    border-radius: var(--radius);
+    padding: 20px;
+    width: 360px;
+    color: #fff;
+}
+
+.pos-shop-card h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.pos-shop-card .pos-shop-badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-weight: 500;
+    margin-bottom: 16px;
+}
+
+.pos-shop-card .pos-shop-register {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.pos-shop-card .pos-shop-register .btn {
+    font-size: 12px;
+    padding: 6px 14px;
+}
+
+.pos-shop-card .pos-shop-info {
+    font-size: 13px;
+    color: rgba(255,255,255,0.6);
+}
+
+.pos-shop-card .pos-shop-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #fff;
+    margin-left: auto;
+    margin-top: 8px;
+}
+
+/* POS Analysis */
+.pos-analysis-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.pos-analysis-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pos-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.pos-filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent);
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.pos-filter-tag .close {
+    cursor: pointer;
+    opacity: 0.7;
+    font-size: 14px;
+}
+
+.pos-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.pos-toolbar select, .pos-toolbar .pos-measure-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 13px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+}
+
+.pos-toolbar .pos-toolbar-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 12px;
+    background: var(--bg-white);
+    cursor: pointer;
+    color: var(--text);
+}
+
+.pos-empty-chart {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    color: var(--text-muted);
+}
+
+.pos-empty-chart .pos-empty-icon {
+    font-size: 80px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.pos-empty-chart h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text);
+}
+
+.pos-empty-chart p {
+    font-size: 14px;
+}
+
 /* ── Print ───────────────────────────────────────────────────────────────────── */
 
 @media print {

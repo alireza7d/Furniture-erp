@@ -521,13 +521,187 @@ async function invoiceSO(id) { await api('/api/sales/orders/' + id + '/invoice',
 
 // ── POS Module ──────────────────────────────────────────────────────────────
 
+let posSubPage = 'pos-home';
+
+function posModuleNav(activePage, extra) {
+    extra = extra || '';
+    return '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon">&#9641;</div>Point of Sale</div>' +
+        '<a class="pos-nav-link' + (activePage === 'pos-home' ? ' active' : '') + '" onclick="renderPOSSubPage(\'pos-home\')">Dashboard</a>' +
+        '<a class="pos-nav-link' + (activePage === 'pos-orders' ? ' active' : '') + '" onclick="renderPOSSubPage(\'pos-orders\')">Orders</a>' +
+        '<a class="pos-nav-link' + (activePage === 'pos-products' ? ' active' : '') + '" onclick="renderPOSSubPage(\'pos-products\')">Products</a>' +
+        '<div class="pos-nav-dropdown">' +
+            '<a class="pos-nav-link' + (activePage.startsWith('pos-report') ? ' active' : '') + '">Reporting</a>' +
+            '<div class="pos-nav-dropdown-menu">' +
+                '<a onclick="renderPOSSubPage(\'pos-report-orders\')">Orders</a>' +
+                '<a onclick="renderPOSSubPage(\'pos-report-sales\')">Sales Details</a>' +
+                '<a onclick="renderPOSSubPage(\'pos-report-session\')">Session Report</a>' +
+                '<a onclick="renderPOSSubPage(\'pos-report-prep\')">Preparation Time</a>' +
+            '</div>' +
+        '</div>' +
+        '<a class="pos-nav-link' + (activePage === 'pos-config' ? ' active' : '') + '" onclick="renderPOSSubPage(\'pos-config\')">Configuration</a>' +
+        extra +
+    '</div>';
+}
+
+async function renderPOSSubPage(sub) {
+    posSubPage = sub;
+    const el = document.getElementById('page-content');
+    switch (sub) {
+        case 'pos-home': await renderPOSHome(el); break;
+        case 'pos-orders': await renderPOSOrders(el); break;
+        case 'pos-products': await renderPOSProductsPage(el); break;
+        case 'pos-report-orders': await renderPOSReportOrders(el); break;
+        case 'pos-report-sales': await renderPOSReportSales(el); break;
+        case 'pos-report-session': await renderPOSReportSession(el); break;
+        case 'pos-report-prep': await renderPOSReportPrep(el); break;
+        case 'pos-config': await renderPOSConfig(el); break;
+        case 'pos-register': await renderPOSRegister(el); break;
+        default: await renderPOSHome(el);
+    }
+}
+
 async function renderPOS(el) {
+    await renderPOSHome(el);
+}
+
+async function renderPOSHome(el) {
+    const rightSection = '<div class="pos-nav-right">' +
+        '<input type="text" placeholder="Search...">' +
+        '<span class="pos-nav-pagination">1-1 / 1</span>' +
+        '<span style="color:rgba(255,255,255,0.4);font-size:13px;">&#9664; &#9654;</span>' +
+        '<div class="pos-nav-views"><button class="active" title="Kanban">&#9638;</button><button title="List">&#9776;</button></div>' +
+    '</div>';
+    el.innerHTML = posModuleNav('pos-home', rightSection) +
+        '<div style="padding:8px 0;">' +
+            '<div class="pos-shop-card">' +
+                '<h3>Furniture Shop</h3>' +
+                '<div class="pos-shop-badge">Opening Control</div>' +
+                '<div class="pos-shop-register">' +
+                    '<button class="btn btn-success" onclick="renderPOSSubPage(\'pos-register\')">Open Register</button>' +
+                    '<span class="pos-shop-info">Opening</span>' +
+                    '<span class="pos-shop-info">0.000 &#1585;.&#1593;.</span>' +
+                '</div>' +
+                '<div class="pos-shop-avatar">A</div>' +
+            '</div>' +
+        '</div>';
+}
+
+async function renderPOSOrders(el) {
+    let orders = [];
+    try { orders = await api('/api/pos/orders'); } catch(e) {}
+    const rightSection = '<div class="pos-nav-right">' +
+        '<input type="text" placeholder="Search...">' +
+        '<span class="pos-nav-pagination">' + (orders.length ? '1-' + orders.length + ' / ' + orders.length : '0') + '</span>' +
+    '</div>';
+    el.innerHTML = posModuleNav('pos-orders', rightSection) +
+        '<h2 style="margin-bottom:16px;">Orders</h2>' +
+        (orders.length ?
+            dbTable('', ['Reference', 'Date', 'Payment', 'Status', 'Total'],
+                orders.slice(0, 20).map(o => [
+                    escHtml(o.reference || ''),
+                    escHtml((o.order_date || o.created_at || '').substring(0, 10)),
+                    escHtml(o.payment_method || ''),
+                    badge(o.status || 'paid'),
+                    '<strong>' + fmt(o.total) + '</strong>'
+                ]))
+            : '<div class="empty-state"><p>No POS orders yet</p></div>');
+}
+
+async function renderPOSProductsPage(el) {
     const products = await api('/api/pos/products');
-    posCart = [];
     const categoryIcons = { Sofa: '&#128715;', Table: '&#9638;', Chair: '&#9641;', Bed: '&#9644;',
         Cabinet: '&#9635;', Shelf: '&#9636;', Desk: '&#9634;', Outdoor: '&#9728;', Accessory: '&#9733;' };
 
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Point of Sale</h1></div>' +
+    posCart = [];
+    el.innerHTML = posModuleNav('pos-products') +
+        '<div class="pos-layout">' +
+            '<div><div style="margin-bottom:12px;"><input type="text" class="form-control" placeholder="Search products..." oninput="filterPOSProducts(this.value)"></div>' +
+            '<div class="pos-products-grid" id="pos-grid">' +
+            products.map(p => '<div class="pos-product-card" data-name="' + escHtml(p.name).toLowerCase() + '" onclick="addToCart(' + p.id + ',&apos;' + escHtml(p.name).replace(/'/g, '') + '&apos;,' + p.sale_price + ')">' +
+                '<div class="pos-product-icon">' + (categoryIcons[p.category] || '&#9642;') + '</div>' +
+                '<div class="pos-product-name">' + escHtml(p.name) + '</div>' +
+                '<div class="pos-product-price">' + fmt(p.sale_price) + '</div>' +
+            '</div>').join('') +
+            '</div></div>' +
+            '<div class="pos-cart">' +
+                '<div class="pos-cart-header">Current Order</div>' +
+                '<div class="pos-cart-items" id="pos-cart-items"><div class="empty-state"><p>No items yet</p></div></div>' +
+                '<div class="pos-cart-footer">' +
+                    '<div id="pos-totals">' +
+                        '<div class="pos-totals-row"><span>Subtotal</span><span id="pos-subtotal">' + fmt(0) + '</span></div>' +
+                        '<div class="pos-totals-row"><span>Tax (10%)</span><span id="pos-tax">' + fmt(0) + '</span></div>' +
+                        '<div class="pos-totals-row total"><span>Total</span><span id="pos-total">' + fmt(0) + '</span></div>' +
+                    '</div>' +
+                    '<div class="pos-payment-buttons">' +
+                        '<button class="btn btn-success" onclick="completePOSOrder(&apos;cash&apos;)">Cash</button>' +
+                        '<button class="btn btn-primary" onclick="completePOSOrder(&apos;card&apos;)">Card</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+}
+
+async function renderPOSReportOrders(el) {
+    const rightSection = '<div class="pos-nav-right">' +
+        '<span class="pos-filter-tag">&#9660; Not Cancelled <span class="close">&times;</span></span>' +
+        '<input type="text" placeholder="Search...">' +
+        '<div class="pos-nav-views"><button class="active" title="Chart">&#128202;</button><button title="Pivot">&#9638;</button></div>' +
+    '</div>';
+    el.innerHTML = posModuleNav('pos-report-orders', rightSection) +
+        '<div class="pos-analysis-header">' +
+            '<h2>Orders Analysis &#9881;</h2>' +
+        '</div>' +
+        '<div class="pos-toolbar">' +
+            '<div class="pos-measure-btn">Total Price &#9660;</div>' +
+            '<div class="pos-toolbar-btn">Insert in Spreadsheet</div>' +
+            '<div class="pos-toolbar-btn">&#128202;</div>' +
+            '<div class="pos-toolbar-btn">&#8682;</div>' +
+        '</div>' +
+        '<div class="pos-empty-chart">' +
+            '<div class="pos-empty-icon">&#128221;</div>' +
+            '<h3>No data yet!</h3>' +
+            '<p>Create a new POS order</p>' +
+        '</div>';
+}
+
+async function renderPOSReportSales(el) {
+    el.innerHTML = posModuleNav('pos-report-sales') +
+        '<h2 style="margin-bottom:16px;">Sales Details</h2>' +
+        '<div class="empty-state"><p>No sales data to display</p></div>';
+}
+
+async function renderPOSReportSession(el) {
+    el.innerHTML = posModuleNav('pos-report-session') +
+        '<h2 style="margin-bottom:16px;">Session Report</h2>' +
+        '<div class="empty-state"><p>No session data to display</p></div>';
+}
+
+async function renderPOSReportPrep(el) {
+    el.innerHTML = posModuleNav('pos-report-prep') +
+        '<h2 style="margin-bottom:16px;">Preparation Time</h2>' +
+        '<div class="empty-state"><p>No preparation time data to display</p></div>';
+}
+
+async function renderPOSConfig(el) {
+    el.innerHTML = posModuleNav('pos-config') +
+        '<h2 style="margin-bottom:16px;">Configuration</h2>' +
+        '<div class="card" style="padding:20px;max-width:600px;">' +
+            '<h3 style="margin-bottom:16px;">Point of Sale Settings</h3>' +
+            '<div class="detail-field"><div class="detail-label">Shop Name</div><div class="detail-value">Furniture Shop</div></div>' +
+            '<div class="detail-field"><div class="detail-label">Currency</div><div class="detail-value">OMR (&#1585;.&#1593;.)</div></div>' +
+            '<div class="detail-field"><div class="detail-label">Tax Rate</div><div class="detail-value">10%</div></div>' +
+            '<div class="detail-field"><div class="detail-label">Payment Methods</div><div class="detail-value">Cash, Card</div></div>' +
+        '</div>';
+}
+
+async function renderPOSRegister(el) {
+    const products = await api('/api/pos/products');
+    const categoryIcons = { Sofa: '&#128715;', Table: '&#9638;', Chair: '&#9641;', Bed: '&#9644;',
+        Cabinet: '&#9635;', Shelf: '&#9636;', Desk: '&#9634;', Outdoor: '&#9728;', Accessory: '&#9733;' };
+
+    posCart = [];
+    el.innerHTML = posModuleNav('pos-home') +
         '<div class="pos-layout">' +
             '<div><div style="margin-bottom:12px;"><input type="text" class="form-control" placeholder="Search products..." oninput="filterPOSProducts(this.value)"></div>' +
             '<div class="pos-products-grid" id="pos-grid">' +
