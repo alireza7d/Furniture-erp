@@ -5,8 +5,1417 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FurnitureERP</title>
     <style>
-TEST
+/* ==============================================================================
+   FurnitureERP - Odoo-inspired ERP Theme
+   ============================================================================== */
+
+:root {
+    --primary: #714B67;
+    --primary-dark: #5B3A52;
+    --primary-light: #8E6B82;
+    --accent: #00A09D;
+    --accent-light: #E0F5F5;
+    --success: #28a745;
+    --warning: #F59E0B;
+    --danger: #DC3545;
+    --info: #17a2b8;
+    --bg: #F0F0F0;
+    --bg-white: #FFFFFF;
+    --text: #2C2C2C;
+    --text-muted: #6B7280;
+    --border: #D1D5DB;
+    --sidebar-width: 240px;
+    --header-height: 50px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.12);
+    --shadow-lg: 0 4px 12px rgba(0,0,0,0.15);
+    --radius: 6px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.app-layout { display: flex; min-height: 100vh; }
+
+.sidebar {
+    width: var(--sidebar-width); background: var(--primary); color: #fff;
+    position: fixed; top: 0; left: 0; bottom: 0; overflow-y: auto; z-index: 100; transition: transform 0.3s;
+}
+.sidebar-header { padding: 16px 20px; border-bottom: 1px solid var(--primary-light); display: flex; align-items: center; gap: 10px; }
+.sidebar-header .logo { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+.sidebar-header .logo span { color: var(--accent); }
+.sidebar-nav { padding: 8px 0; }
+.nav-section { padding: 12px 20px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.5); font-weight: 600; }
+.nav-item { display: flex; align-items: center; gap: 12px; padding: 9px 20px; color: rgba(255,255,255,0.85); cursor: pointer; transition: all 0.15s; text-decoration: none; font-size: 13.5px; }
+.nav-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.nav-item.active { background: rgba(255,255,255,0.18); color: #fff; font-weight: 600; border-right: 3px solid var(--accent); }
+.nav-item .icon { width: 20px; text-align: center; font-size: 16px; }
+.main-area { margin-left: var(--sidebar-width); flex: 1; display: flex; flex-direction: column; }
+
+.top-header { height: var(--header-height); background: var(--bg-white); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; position: sticky; top: 0; z-index: 50; box-shadow: var(--shadow); }
+.header-left { display: flex; align-items: center; gap: 16px; }
+.breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-muted); }
+.breadcrumb .current { color: var(--text); font-weight: 600; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.search-box { position: relative; }
+.search-box input { padding: 6px 12px 6px 32px; border: 1px solid var(--border); border-radius: 20px; font-size: 13px; width: 220px; outline: none; transition: border-color 0.2s; }
+.search-box input:focus { border-color: var(--primary); }
+.search-box .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+.user-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; }
+
+.content-area { padding: 20px 24px; flex: 1; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.page-title { font-size: 22px; font-weight: 700; color: var(--text); }
+.page-actions { display: flex; gap: 8px; }
+
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; border: 1px solid transparent; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; text-decoration: none; white-space: nowrap; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { opacity: 0.9; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { opacity: 0.9; }
+.btn-outline { background: #fff; border-color: var(--border); color: var(--text); }
+.btn-outline:hover { background: var(--bg); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-accent { background: var(--accent); color: #fff; }
+.btn-accent:hover { opacity: 0.9; }
+.btn-warning { background: var(--warning); color: #fff; }
+
+.card { background: var(--bg-white); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border); }
+.card-header { padding: 14px 18px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 15px; display: flex; align-items: center; justify-content: space-between; }
+.card-body { padding: 18px; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.stat-card { background: var(--bg-white); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); border: 1px solid var(--border); border-left: 4px solid var(--primary); }
+.stat-card.accent { border-left-color: var(--accent); }
+.stat-card.success { border-left-color: var(--success); }
+.stat-card.warning { border-left-color: var(--warning); }
+.stat-card.danger { border-left-color: var(--danger); }
+.stat-card.info { border-left-color: var(--info); }
+.stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.stat-value { font-size: 26px; font-weight: 700; color: var(--text); }
+.stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+.table-wrapper { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+table th { background: #F9FAFB; padding: 10px 14px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid var(--border); }
+table td { padding: 10px 14px; border-bottom: 1px solid #F3F4F6; font-size: 13.5px; }
+table tr:hover { background: #F9FAFB; }
+table tr { cursor: pointer; }
+
+.badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 600; text-transform: capitalize; }
+.badge-new, .badge-draft { background: #E5E7EB; color: #374151; }
+.badge-qualified, .badge-confirmed, .badge-sent { background: #DBEAFE; color: #1E40AF; }
+.badge-proposition, .badge-in_progress, .badge-sending, .badge-scheduled { background: #FEF3C7; color: #92400E; }
+.badge-won, .badge-paid, .badge-done, .badge-received, .badge-completed, .badge-delivered { background: #D1FAE5; color: #065F46; }
+.badge-lost, .badge-cancelled, .badge-overdue { background: #FEE2E2; color: #991B1B; }
+.badge-invoiced { background: #E0E7FF; color: #3730A3; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.2s; }
+.modal-overlay.show { opacity: 1; visibility: visible; }
+.modal { background: var(--bg-white); border-radius: 8px; box-shadow: var(--shadow-lg); width: 90%; max-width: 640px; max-height: 85vh; overflow-y: auto; transform: translateY(20px); transition: transform 0.2s; }
+.modal-overlay.show .modal { transform: translateY(0); }
+.modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-size: 17px; font-weight: 600; }
+.modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-muted); padding: 4px; line-height: 1; }
+.modal-body { padding: 20px; }
+.modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
+.form-control { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13.5px; outline: none; transition: border-color 0.2s; font-family: inherit; }
+.form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(113, 75, 103, 0.1); }
+textarea.form-control { min-height: 80px; resize: vertical; }
+select.form-control { appearance: auto; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.kanban-board { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 16px; }
+.kanban-column { min-width: 270px; flex: 1; background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border); }
+.kanban-column-header { padding: 12px 14px; font-weight: 600; font-size: 13.5px; border-bottom: 1px solid var(--border); background: #F9FAFB; border-radius: var(--radius) var(--radius) 0 0; display: flex; align-items: center; justify-content: space-between; }
+.kanban-column-header .count { background: var(--primary); color: #fff; font-size: 11px; padding: 1px 8px; border-radius: 10px; }
+.kanban-cards { padding: 10px; min-height: 100px; }
+.kanban-card { background: var(--bg-white); border-radius: var(--radius); padding: 12px; margin-bottom: 8px; box-shadow: var(--shadow); border: 1px solid var(--border); cursor: pointer; transition: box-shadow 0.15s; }
+.kanban-card:hover { box-shadow: var(--shadow-lg); }
+.kanban-card-title { font-weight: 600; font-size: 13.5px; margin-bottom: 4px; }
+.kanban-card-sub { font-size: 12px; color: var(--text-muted); }
+.kanban-card-amount { font-size: 15px; font-weight: 700; color: var(--primary); margin-top: 6px; }
+
+.pos-layout { display: grid; grid-template-columns: 1fr 380px; gap: 20px; height: calc(100vh - var(--header-height) - 90px); }
+.pos-products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; align-content: start; overflow-y: auto; padding: 4px; }
+.pos-product-card { background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; text-align: center; cursor: pointer; transition: all 0.15s; }
+.pos-product-card:hover { border-color: var(--primary); box-shadow: var(--shadow-lg); }
+.pos-product-icon { font-size: 32px; margin-bottom: 6px; }
+.pos-product-name { font-size: 12.5px; font-weight: 600; margin-bottom: 2px; line-height: 1.3; }
+.pos-product-price { font-size: 14px; font-weight: 700; color: var(--primary); }
+.pos-cart { background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; }
+.pos-cart-header { padding: 14px 16px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 15px; }
+.pos-cart-items { flex: 1; overflow-y: auto; padding: 8px 0; }
+.pos-cart-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid #F3F4F6; }
+.pos-cart-item-info { flex: 1; }
+.pos-cart-item-name { font-weight: 500; font-size: 13px; }
+.pos-cart-item-price { font-size: 12px; color: var(--text-muted); }
+.pos-cart-item-qty { display: flex; align-items: center; gap: 6px; }
+.pos-cart-item-qty button { width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+.pos-cart-item-subtotal { font-weight: 600; min-width: 70px; text-align: right; font-size: 13px; }
+.pos-cart-footer { border-top: 2px solid var(--border); padding: 14px 16px; }
+.pos-totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+.pos-totals-row.total { font-size: 18px; font-weight: 700; color: var(--primary); padding-top: 8px; margin-top: 4px; border-top: 1px solid var(--border); }
+.pos-payment-buttons { display: flex; gap: 8px; margin-top: 12px; }
+.pos-payment-buttons .btn { flex: 1; justify-content: center; }
+
+.tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 16px; }
+.tab { padding: 8px 18px; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.detail-field { margin-bottom: 12px; }
+.detail-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+.detail-value { font-size: 14px; font-weight: 500; }
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+.empty-state p { font-size: 15px; }
+
+.toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+.toast { background: #333; color: #fff; padding: 12px 20px; border-radius: var(--radius); font-size: 13.5px; box-shadow: var(--shadow-lg); animation: slideIn 0.3s ease; max-width: 350px; }
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+@media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main-area { margin-left: 0; }
+    .pos-layout { grid-template-columns: 1fr; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media print {
+    .sidebar, .top-header, .page-actions, .modal-overlay { display: none !important; }
+    .main-area { margin-left: 0; }
+    .content-area { padding: 0; }
+}
+
+.email-preview { background: #f9f9f9; border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-top: 8px; min-height: 120px; }
+.sms-char-count { font-size: 11px; color: var(--text-muted); text-align: right; margin-top: 4px; }
+
+.divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+.text-muted { color: var(--text-muted); }
+.text-success { color: var(--success); }
+.text-danger { color: var(--danger); }
+.text-primary { color: var(--primary); }
+.fw-bold { font-weight: 600; }
+.mt-2 { margin-top: 8px; }
+.mt-4 { margin-top: 16px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-4 { margin-bottom: 16px; }
+.gap-2 { gap: 8px; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+
     </style>
 </head>
-<body>TEST</body>
+<body>
+<div class="app-layout" id="app">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">Furniture<span>ERP</span></div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">Main</div>
+            <a class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+                <span class="icon">&#9632;</span> Dashboard
+            </a>
+            <div class="nav-section">Sales</div>
+            <a class="nav-item" data-page="crm" onclick="navigate('crm')">
+                <span class="icon">&#9733;</span> CRM
+            </a>
+            <a class="nav-item" data-page="sales" onclick="navigate('sales')">
+                <span class="icon">&#9830;</span> Sales
+            </a>
+            <a class="nav-item" data-page="pos" onclick="navigate('pos')">
+                <span class="icon">&#9641;</span> Point of Sale
+            </a>
+            <div class="nav-section">Operations</div>
+            <a class="nav-item" data-page="inventory" onclick="navigate('inventory')">
+                <span class="icon">&#9634;</span> Inventory
+            </a>
+            <a class="nav-item" data-page="purchase" onclick="navigate('purchase')">
+                <span class="icon">&#9660;</span> Purchase
+            </a>
+            <a class="nav-item" data-page="manufacturing" onclick="navigate('manufacturing')">
+                <span class="icon">&#9881;</span> Manufacturing
+            </a>
+            <div class="nav-section">Finance</div>
+            <a class="nav-item" data-page="accounting" onclick="navigate('accounting')">
+                <span class="icon">&#9783;</span> Accounting
+            </a>
+            <div class="nav-section">Marketing</div>
+            <a class="nav-item" data-page="email-marketing" onclick="navigate('email-marketing')">
+                <span class="icon">&#9993;</span> Email Marketing
+            </a>
+            <a class="nav-item" data-page="sms-marketing" onclick="navigate('sms-marketing')">
+                <span class="icon">&#9742;</span> SMS Marketing
+            </a>
+            <div class="nav-section">Master Data</div>
+            <a class="nav-item" data-page="contacts" onclick="navigate('contacts')">
+                <span class="icon">&#9786;</span> Contacts
+            </a>
+            <a class="nav-item" data-page="products" onclick="navigate('products')">
+                <span class="icon">&#9642;</span> Products
+            </a>
+        </nav>
+    </aside>
+
+    <div class="main-area">
+        <header class="top-header">
+            <div class="header-left">
+                <div class="breadcrumb">
+                    <span>FurnitureERP</span>
+                    <span>/</span>
+                    <span class="current" id="breadcrumb-page">Dashboard</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="search-box">
+                    <span class="search-icon">&#128269;</span>
+                    <input type="text" placeholder="Search..." id="global-search">
+                </div>
+                <div class="user-avatar">AD</div>
+            </div>
+        </header>
+
+        <main class="content-area" id="content">
+        </main>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-overlay">
+    <div class="modal" id="modal">
+        <div class="modal-header">
+            <span id="modal-title">Title</span>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer" id="modal-footer"></div>
+    </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// FurnitureERP — Standalone JavaScript (No Server Required)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Data Store ────────────────────────────────────────────────────────────────
+
+let nextId = 100;
+function genId() { return nextId++; }
+function today() { return new Date().toISOString().slice(0, 10); }
+function money(n) { return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+const DB = {
+    contacts: [
+        {id:1, name:'Emily Carter', email:'emily@livingstyle.com', phone:'555-0101', company:'Living Style Co.', is_customer:true, is_vendor:false, city:'New York', state:'NY', address:'123 Broadway', notes:'Preferred customer, bulk buyer', opt_in_email:true, opt_in_sms:true},
+        {id:2, name:'Marcus Johnson', email:'marcus@urbaninteriors.com', phone:'555-0102', company:'Urban Interiors', is_customer:true, is_vendor:false, city:'Chicago', state:'IL', address:'456 Michigan Ave', notes:'Interior design firm', opt_in_email:true, opt_in_sms:false},
+        {id:3, name:'Sarah Williams', email:'sarah@homeelegance.com', phone:'555-0103', company:'Home Elegance', is_customer:true, is_vendor:false, city:'Los Angeles', state:'CA', address:'789 Sunset Blvd', notes:'High-end residential projects', opt_in_email:true, opt_in_sms:true},
+        {id:4, name:'David Chen', email:'david@modernhome.com', phone:'555-0104', company:'Modern Home Depot', is_customer:true, is_vendor:false, city:'San Francisco', state:'CA', address:'321 Market St', notes:'Regular quarterly orders', opt_in_email:false, opt_in_sms:true},
+        {id:5, name:'Oak Valley Timber', email:'sales@oakvalley.com', phone:'555-0201', company:'Oak Valley Timber', is_customer:false, is_vendor:true, city:'Portland', state:'OR', address:'100 Lumber Rd', notes:'Primary hardwood supplier', opt_in_email:true, opt_in_sms:false},
+        {id:6, name:'Steel Frame Industries', email:'orders@steelframe.com', phone:'555-0202', company:'Steel Frame Industries', is_customer:false, is_vendor:true, city:'Pittsburgh', state:'PA', address:'200 Steel Way', notes:'Metal components and frames', opt_in_email:true, opt_in_sms:true},
+        {id:7, name:'Comfort Fabrics Ltd', email:'info@comfortfab.com', phone:'555-0203', company:'Comfort Fabrics Ltd', is_customer:false, is_vendor:true, city:'Charlotte', state:'NC', address:'300 Textile Dr', notes:'Upholstery fabrics and foam', opt_in_email:true, opt_in_sms:false},
+        {id:8, name:'Glass & Mirror Pro', email:'info@glasspro.com', phone:'555-0204', company:'Glass & Mirror Pro', is_customer:false, is_vendor:true, city:'Phoenix', state:'AZ', address:'400 Desert Blvd', notes:'Glass tabletops and mirrors', opt_in_email:true, opt_in_sms:true},
+        {id:9, name:'Rachel Foster', email:'rachel@boutiquehotel.com', phone:'555-0105', company:'Boutique Hotel Group', is_customer:true, is_vendor:false, city:'Miami', state:'FL', address:'500 Ocean Dr', notes:'Hotel furnishing contracts', opt_in_email:true, opt_in_sms:true},
+        {id:10, name:'James Mitchell', email:'james@officespace.com', phone:'555-0106', company:'Office Space Inc.', is_customer:true, is_vendor:false, city:'Austin', state:'TX', address:'600 Tech Blvd', notes:'Corporate office furniture', opt_in_email:true, opt_in_sms:false},
+    ],
+    products: [
+        {id:1, name:'Velvet Sofa - Navy', sku:'SOF-001', category:'Sofas', price:1299.00, cost:650.00, stock:12, icon:'&#128715;', type:'product'},
+        {id:2, name:'Leather Sectional - Brown', sku:'SOF-002', category:'Sofas', price:2499.00, cost:1200.00, stock:5, icon:'&#128715;', type:'product'},
+        {id:3, name:'Oak Dining Table 6-Seater', sku:'TBL-001', category:'Tables', price:899.00, cost:420.00, stock:8, icon:'&#9638;', type:'product'},
+        {id:4, name:'Glass Coffee Table', sku:'TBL-002', category:'Tables', price:449.00, cost:180.00, stock:15, icon:'&#9638;', type:'product'},
+        {id:5, name:'Executive Office Desk', sku:'DSK-001', category:'Desks', price:749.00, cost:350.00, stock:10, icon:'&#9638;', type:'product'},
+        {id:6, name:'Standing Desk - Adjustable', sku:'DSK-002', category:'Desks', price:599.00, cost:280.00, stock:18, icon:'&#9638;', type:'product'},
+        {id:7, name:'Ergonomic Office Chair', sku:'CHR-001', category:'Chairs', price:399.00, cost:170.00, stock:25, icon:'&#9641;', type:'product'},
+        {id:8, name:'Dining Chair Set (4)', sku:'CHR-002', category:'Chairs', price:599.00, cost:250.00, stock:14, icon:'&#9641;', type:'product'},
+        {id:9, name:'Queen Bed Frame - Walnut', sku:'BED-001', category:'Beds', price:999.00, cost:480.00, stock:6, icon:'&#9644;', type:'product'},
+        {id:10, name:'King Bed Frame - Oak', sku:'BED-002', category:'Beds', price:1299.00, cost:620.00, stock:4, icon:'&#9644;', type:'product'},
+        {id:11, name:'Wardrobe Cabinet - White', sku:'CAB-001', category:'Cabinets', price:849.00, cost:400.00, stock:7, icon:'&#9634;', type:'product'},
+        {id:12, name:'Kitchen Cabinet Set', sku:'CAB-002', category:'Cabinets', price:1599.00, cost:750.00, stock:3, icon:'&#9634;', type:'product'},
+        {id:13, name:'Floating Wall Shelf (Set 3)', sku:'SHL-001', category:'Shelves', price:149.00, cost:55.00, stock:30, icon:'&#9644;', type:'product'},
+        {id:14, name:'Bookshelf 5-Tier', sku:'SHL-002', category:'Shelves', price:329.00, cost:140.00, stock:11, icon:'&#9644;', type:'product'},
+        {id:15, name:'Patio Lounge Chair', sku:'OUT-001', category:'Outdoor', price:449.00, cost:200.00, stock:20, icon:'&#9728;', type:'product'},
+        {id:16, name:'Garden Dining Set', sku:'OUT-002', category:'Outdoor', price:1199.00, cost:550.00, stock:6, icon:'&#9728;', type:'product'},
+        {id:17, name:'Decorative Throw Pillow', sku:'ACC-001', category:'Accessories', price:39.00, cost:12.00, stock:50, icon:'&#10026;', type:'product'},
+        {id:18, name:'Table Lamp - Brass', sku:'ACC-002', category:'Accessories', price:89.00, cost:35.00, stock:22, icon:'&#10026;', type:'product'},
+        {id:19, name:'Hardwood Lumber (per board ft)', sku:'RAW-001', category:'Raw Materials', price:12.00, cost:8.00, stock:500, icon:'&#9648;', type:'raw'},
+        {id:20, name:'Upholstery Fabric (per yard)', sku:'RAW-002', category:'Raw Materials', price:25.00, cost:15.00, stock:300, icon:'&#9648;', type:'raw'},
+    ],
+    leads: [
+        {id:1, name:'Hotel Lobby Renovation', contact_id:9, email:'rachel@boutiquehotel.com', phone:'555-0105', stage:'won', expected_revenue:45000, probability:100, notes:'Complete lobby and lounge furniture package', created_at:'2026-02-10'},
+        {id:2, name:'Office Expansion Project', contact_id:10, email:'james@officespace.com', phone:'555-0106', stage:'proposition', expected_revenue:28000, probability:60, notes:'50 workstations + conference rooms', created_at:'2026-02-18'},
+        {id:3, name:'Apartment Complex Furnishing', contact_id:1, email:'emily@livingstyle.com', phone:'555-0101', stage:'qualified', expected_revenue:62000, probability:40, notes:'Furnishing for 30 apartment units', created_at:'2026-02-25'},
+        {id:4, name:'Restaurant Interior Design', contact_id:2, email:'marcus@urbaninteriors.com', phone:'555-0102', stage:'new', expected_revenue:18000, probability:20, notes:'Tables and chairs for new restaurant', created_at:'2026-03-01'},
+        {id:5, name:'Luxury Condo Staging', contact_id:3, email:'sarah@homeelegance.com', phone:'555-0103', stage:'new', expected_revenue:35000, probability:15, notes:'Staging furniture for 5 luxury condos', created_at:'2026-03-03'},
+        {id:6, name:'Co-working Space Setup', contact_id:4, email:'david@modernhome.com', phone:'555-0104', stage:'qualified', expected_revenue:22000, probability:50, notes:'Desks, chairs, lounge area', created_at:'2026-02-20'},
+        {id:7, name:'Beach Resort Outdoor', contact_id:9, email:'rachel@boutiquehotel.com', phone:'555-0105', stage:'proposition', expected_revenue:31000, probability:55, notes:'Pool and patio furniture for resort', created_at:'2026-02-15'},
+        {id:8, name:'Showroom Redesign', contact_id:1, email:'emily@livingstyle.com', phone:'555-0101', stage:'lost', expected_revenue:15000, probability:0, notes:'Lost to competitor pricing', created_at:'2026-01-10'},
+    ],
+    salesOrders: [
+        {id:1, ref:'SO-001', customer_id:1, customer_name:'Emily Carter', date:'2026-02-15', status:'delivered', lines:[{product_id:1,name:'Velvet Sofa - Navy',qty:3,price:1299},{product_id:7,name:'Ergonomic Office Chair',qty:6,price:399},{product_id:17,name:'Decorative Throw Pillow',qty:10,price:39}], notes:'Delivery to showroom'},
+        {id:2, ref:'SO-002', customer_id:2, customer_name:'Marcus Johnson', date:'2026-02-20', status:'confirmed', lines:[{product_id:3,name:'Oak Dining Table 6-Seater',qty:4,price:899},{product_id:8,name:'Dining Chair Set (4)',qty:4,price:599}], notes:'Restaurant project phase 1'},
+        {id:3, ref:'SO-003', customer_id:3, customer_name:'Sarah Williams', date:'2026-02-28', status:'invoiced', lines:[{product_id:9,name:'Queen Bed Frame - Walnut',qty:2,price:999},{product_id:2,name:'Leather Sectional - Brown',qty:1,price:2499},{product_id:18,name:'Table Lamp - Brass',qty:4,price:89}], notes:'Luxury condo units 1 & 2'},
+        {id:4, ref:'SO-004', customer_id:9, customer_name:'Rachel Foster', date:'2026-03-02', status:'draft', lines:[{product_id:15,name:'Patio Lounge Chair',qty:12,price:449},{product_id:16,name:'Garden Dining Set',qty:3,price:1199}], notes:'Hotel pool area'},
+        {id:5, ref:'SO-005', customer_id:10, customer_name:'James Mitchell', date:'2026-03-05', status:'confirmed', lines:[{product_id:5,name:'Executive Office Desk',qty:5,price:749},{product_id:7,name:'Ergonomic Office Chair',qty:10,price:399},{product_id:6,name:'Standing Desk - Adjustable',qty:3,price:599}], notes:'Office expansion floor 3'},
+    ],
+    purchaseOrders: [
+        {id:1, ref:'PO-001', vendor_id:5, vendor_name:'Oak Valley Timber', date:'2026-02-10', status:'received', lines:[{product_id:19,name:'Hardwood Lumber (per board ft)',qty:200,price:8}], notes:'Monthly lumber supply'},
+        {id:2, ref:'PO-002', vendor_id:7, vendor_name:'Comfort Fabrics Ltd', date:'2026-02-18', status:'confirmed', lines:[{product_id:20,name:'Upholstery Fabric (per yard)',qty:150,price:15}], notes:'Q1 fabric order'},
+        {id:3, ref:'PO-003', vendor_id:6, vendor_name:'Steel Frame Industries', date:'2026-03-01', status:'draft', lines:[{product_id:19,name:'Steel Tubes (bundle)',qty:50,price:45},{product_id:19,name:'Bracket Set',qty:100,price:12}], notes:'Manufacturing supplies'},
+        {id:4, ref:'PO-004', vendor_id:8, vendor_name:'Glass & Mirror Pro', date:'2026-03-04', status:'confirmed', lines:[{product_id:19,name:'Tempered Glass 48x24',qty:20,price:65},{product_id:19,name:'Mirror Panel 36x24',qty:10,price:42}], notes:'Table tops and mirrors'},
+    ],
+    invoices: [
+        {id:1, ref:'INV-001', type:'customer', contact_id:1, contact_name:'Emily Carter', date:'2026-02-20', due_date:'2026-03-20', status:'paid', lines:[{description:'Velvet Sofa - Navy x3',qty:3,price:1299},{description:'Ergonomic Office Chair x6',qty:6,price:399},{description:'Decorative Throw Pillow x10',qty:10,price:39}]},
+        {id:2, ref:'INV-002', type:'customer', contact_id:3, contact_name:'Sarah Williams', date:'2026-03-01', due_date:'2026-03-31', status:'sent', lines:[{description:'Queen Bed Frame - Walnut x2',qty:2,price:999},{description:'Leather Sectional - Brown',qty:1,price:2499},{description:'Table Lamp - Brass x4',qty:4,price:89}]},
+        {id:3, ref:'INV-003', type:'vendor', contact_id:5, contact_name:'Oak Valley Timber', date:'2026-02-12', due_date:'2026-03-12', status:'paid', lines:[{description:'Hardwood Lumber 200 board ft',qty:200,price:8}]},
+        {id:4, ref:'INV-004', type:'vendor', contact_id:7, contact_name:'Comfort Fabrics Ltd', date:'2026-02-20', due_date:'2026-03-20', status:'sent', lines:[{description:'Upholstery Fabric 150 yards',qty:150,price:15}]},
+        {id:5, ref:'INV-005', type:'customer', contact_id:9, contact_name:'Rachel Foster', date:'2026-03-05', due_date:'2026-04-04', status:'draft', lines:[{description:'Patio Lounge Chair x12',qty:12,price:449},{description:'Garden Dining Set x3',qty:3,price:1199}]},
+    ],
+    manufacturingOrders: [
+        {id:1, ref:'MO-001', product_id:1, product_name:'Velvet Sofa - Navy', bom_id:1, qty:5, status:'done', start_date:'2026-02-01', end_date:'2026-02-14'},
+        {id:2, ref:'MO-002', product_id:3, product_name:'Oak Dining Table 6-Seater', bom_id:2, qty:4, status:'in_progress', start_date:'2026-02-20', end_date:null},
+        {id:3, ref:'MO-003', product_id:9, product_name:'Queen Bed Frame - Walnut', bom_id:3, qty:3, status:'confirmed', start_date:'2026-03-10', end_date:null},
+        {id:4, ref:'MO-004', product_id:5, product_name:'Executive Office Desk', bom_id:null, qty:8, status:'draft', start_date:'2026-03-15', end_date:null},
+    ],
+    boms: [
+        {id:1, product_id:1, product_name:'Velvet Sofa - Navy', lines:[{material:'Hardwood Frame',qty:1,unit:'piece',cost:120},{material:'Velvet Fabric',qty:8,unit:'yards',cost:25},{material:'High-density Foam',qty:4,unit:'blocks',cost:35},{material:'Sofa Legs - Brass',qty:4,unit:'pieces',cost:15}]},
+        {id:2, product_id:3, product_name:'Oak Dining Table 6-Seater', lines:[{material:'Oak Lumber',qty:30,unit:'board ft',cost:8},{material:'Wood Stain - Walnut',qty:2,unit:'liters',cost:18},{material:'Table Leg Set',qty:1,unit:'set',cost:85},{material:'Hardware Kit',qty:1,unit:'kit',cost:25}]},
+        {id:3, product_id:9, product_name:'Queen Bed Frame - Walnut', lines:[{material:'Walnut Lumber',qty:40,unit:'board ft',cost:10},{material:'Slat Support System',qty:1,unit:'set',cost:65},{material:'Headboard Upholstery',qty:3,unit:'yards',cost:30},{material:'Hardware Kit',qty:1,unit:'kit',cost:28}]},
+    ],
+    emailCampaigns: [
+        {id:1, name:'Spring Collection Launch', subject:'Discover Our Spring 2026 Furniture Collection', status:'sent', sent:1250, opened:780, clicked:245, date:'2026-02-15', list_id:1},
+        {id:2, name:'Warehouse Clearance Sale', subject:'Up to 40% Off - Warehouse Clearance Event', status:'sent', sent:2100, opened:1470, clicked:630, date:'2026-02-28', list_id:2},
+        {id:3, name:'New Outdoor Collection', subject:'Get Ready for Summer - Outdoor Furniture Preview', status:'scheduled', sent:0, opened:0, clicked:0, date:'2026-03-15', list_id:1},
+    ],
+    smsCampaigns: [
+        {id:1, name:'Flash Sale Alert', message:'FLASH SALE! 25% off all sofas this weekend only. Shop now at FurnitureERP.com. Reply STOP to unsubscribe.', status:'sent', sent:850, date:'2026-02-20'},
+        {id:2, name:'Delivery Reminder', message:'Your FurnitureERP order is out for delivery today! Track at FurnitureERP.com/track. Reply STOP to unsubscribe.', status:'scheduled', sent:0, date:'2026-03-10'},
+    ],
+    mailingLists: [
+        {id:1, name:'All Customers', count:6, contacts:[1,2,3,4,9,10]},
+        {id:2, name:'VIP Buyers', count:3, contacts:[1,3,9]},
+        {id:3, name:'Newsletter Subscribers', count:4, contacts:[1,2,3,10]},
+    ],
+    posCart: [],
+};
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+
+function toast(msg, type='success') {
+    const c = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    t.className = 'toast ' + type;
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+}
+
+function openModal(title, bodyHtml, footerHtml='') {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-body').innerHTML = bodyHtml;
+    document.getElementById('modal-footer').innerHTML = footerHtml;
+    document.getElementById('modal-overlay').classList.add('show');
+}
+
+function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('show');
+}
+
+function badge(status) {
+    return '<span class="badge badge-' + status + '">' + status.replace('_', ' ') + '</span>';
+}
+
+function orderTotal(lines) {
+    return lines.reduce((s, l) => s + l.qty * l.price, 0);
+}
+
+let currentPage = 'dashboard';
+
+function navigate(page) {
+    currentPage = page;
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const navItem = document.querySelector('.nav-item[data-page="'+page+'"]');
+    if (navItem) navItem.classList.add('active');
+    const names = {dashboard:'Dashboard',crm:'CRM',sales:'Sales',pos:'Point of Sale',inventory:'Inventory',purchase:'Purchase',manufacturing:'Manufacturing',accounting:'Accounting','email-marketing':'Email Marketing','sms-marketing':'SMS Marketing',contacts:'Contacts',products:'Products'};
+    document.getElementById('breadcrumb-page').textContent = names[page] || page;
+    const renderer = {
+        dashboard: renderDashboard, crm: renderCRM, sales: renderSales, pos: renderPOS,
+        inventory: renderInventory, purchase: renderPurchase, manufacturing: renderManufacturing,
+        accounting: renderAccounting, 'email-marketing': renderEmailMarketing,
+        'sms-marketing': renderSMSMarketing, contacts: renderContacts, products: renderProducts
+    };
+    if (renderer[page]) renderer[page]();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
+
+function renderDashboard() {
+    const totalProducts = DB.products.length;
+    const totalContacts = DB.contacts.length;
+    const totalSales = DB.salesOrders.length;
+    const salesRevenue = DB.salesOrders.reduce((s,o) => s + orderTotal(o.lines), 0);
+    const totalLeads = DB.leads.length;
+    const wonDeals = DB.leads.filter(l => l.stage==='won').length;
+    const openPOs = DB.purchaseOrders.filter(p => p.status!=='received').length;
+    const mfgActive = DB.manufacturingOrders.filter(m => m.status==='in_progress').length;
+    const totalInvoiced = DB.invoices.filter(i=>i.type==='customer').reduce((s,i)=>s+orderTotal(i.lines),0);
+    const totalPaid = DB.invoices.filter(i=>i.type==='customer'&&i.status==='paid').reduce((s,i)=>s+orderTotal(i.lines),0);
+    const stockValue = DB.products.reduce((s,p) => s + p.stock * p.cost, 0);
+
+    document.getElementById('content').innerHTML = `
+        <div class="page-header"><h1 class="page-title">Dashboard</h1></div>
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-label">Total Revenue</div><div class="stat-value">${money(salesRevenue)}</div><div class="stat-sub">${totalSales} sales orders</div></div>
+            <div class="stat-card accent"><div class="stat-label">CRM Pipeline</div><div class="stat-value">${totalLeads}</div><div class="stat-sub">${wonDeals} won deals</div></div>
+            <div class="stat-card success"><div class="stat-label">Invoiced</div><div class="stat-value">${money(totalInvoiced)}</div><div class="stat-sub">${money(totalPaid)} collected</div></div>
+            <div class="stat-card warning"><div class="stat-label">Stock Value</div><div class="stat-value">${money(stockValue)}</div><div class="stat-sub">${totalProducts} products</div></div>
+            <div class="stat-card info"><div class="stat-label">Contacts</div><div class="stat-value">${totalContacts}</div><div class="stat-sub">${DB.contacts.filter(c=>c.is_customer).length} customers, ${DB.contacts.filter(c=>c.is_vendor).length} vendors</div></div>
+            <div class="stat-card danger"><div class="stat-label">Open POs</div><div class="stat-value">${openPOs}</div><div class="stat-sub">${DB.purchaseOrders.length} total</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <div class="card"><div class="card-header">Recent Sales Orders</div><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>Ref</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead><tbody>
+                ${DB.salesOrders.slice(0,5).map(o=>'<tr onclick="navigate(\'sales\')"><td>${o.ref}</td><td>${o.customer_name}</td><td>${money(orderTotal(o.lines))}</td><td>${badge(o.status)}</td></tr>'.replace(/\$\{o\.ref\}/g,o.ref).replace(/\$\{o\.customer_name\}/g,o.customer_name).replace(/\$\{money\(orderTotal\(o\.lines\)\)\}/g,money(orderTotal(o.lines))).replace(/\$\{badge\(o\.status\)\}/g,badge(o.status))).join('')}
+            </tbody></table></div></div></div>
+            <div class="card"><div class="card-header">Manufacturing Status</div><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>Ref</th><th>Product</th><th>Qty</th><th>Status</th></tr></thead><tbody>
+                ${DB.manufacturingOrders.map(m=>`<tr onclick="navigate('manufacturing')"><td>${m.ref}</td><td>${m.product_name}</td><td>${m.qty}</td><td>${badge(m.status)}</td></tr>`).join('')}
+            </tbody></table></div></div></div>
+        </div>
+    `;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CRM
+// ══════════════════════════════════════════════════════════════════════════════
+
+function renderCRM() {
+    const stages = ['new','qualified','proposition','won','lost'];
+    const stageNames = {new:'New',qualified:'Qualified',proposition:'Proposition',won:'Won',lost:'Lost'};
+    let html = `<div class="page-header"><h1 class="page-title">CRM Pipeline</h1><div class="page-actions"><button class="btn btn-primary" onclick="newLeadForm()">+ New Lead</button></div></div>`;
+    html += '<div class="kanban-board">';
+    stages.forEach(stage => {
+        const cards = DB.leads.filter(l => l.stage === stage);
+        html += `<div class="kanban-column"><div class="kanban-column-header">${stageNames[stage]} <span class="count">${cards.length}</span></div><div class="kanban-cards">`;
+        cards.forEach(l => {
+            html += `<div class="kanban-card" onclick="viewLead(${l.id})"><div class="kanban-card-title">${l.name}</div><div class="kanban-card-sub">${l.email}</div><div class="kanban-card-amount">${money(l.expected_revenue)}</div></div>`;
+        });
+        html += '</div></div>';
+    });
+    html += '</div>';
+    document.getElementById('content').innerHTML = html;
+}
+
+function viewLead(id) {
+    const l = DB.leads.find(x => x.id === id);
+    if (!l) return;
+    const stages = ['new','qualified','proposition','won','lost'];
+    const stageOptions = stages.map(s => `<option value="${s}" ${l.stage===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('');
+    openModal(l.name, `
+        <div class="detail-grid">
+            <div><div class="detail-field"><div class="detail-label">Contact</div><div class="detail-value">${l.email}</div></div>
+                <div class="detail-field"><div class="detail-label">Phone</div><div class="detail-value">${l.phone||'-'}</div></div>
+                <div class="detail-field"><div class="detail-label">Expected Revenue</div><div class="detail-value">${money(l.expected_revenue)}</div></div></div>
+            <div><div class="detail-field"><div class="detail-label">Stage</div><div class="detail-value"><select class="form-control" id="lead-stage">${stageOptions}</select></div></div>
+                <div class="detail-field"><div class="detail-label">Probability</div><div class="detail-value">${l.probability}%</div></div>
+                <div class="detail-field"><div class="detail-label">Created</div><div class="detail-value">${l.created_at}</div></div></div>
+        </div>
+        <hr class="divider"><div class="detail-field"><div class="detail-label">Notes</div><div class="detail-value">${l.notes||'-'}</div></div>
+    `, `<button class="btn btn-primary" onclick="updateLeadStage(${l.id})">Update Stage</button><button class="btn btn-outline" onclick="closeModal()">Close</button>`);
+}
+
+function updateLeadStage(id) {
+    const l = DB.leads.find(x => x.id === id);
+    if (!l) return;
+    l.stage = document.getElementById('lead-stage').value;
+    if (l.stage === 'won') l.probability = 100;
+    if (l.stage === 'lost') l.probability = 0;
+    closeModal();
+    toast('Lead stage updated');
+    renderCRM();
+}
+
+function newLeadForm() {
+    const contactOpts = DB.contacts.filter(c=>c.is_customer).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    openModal('New Lead', `
+        <div class="form-group"><label>Lead Name</label><input class="form-control" id="lead-name" placeholder="e.g. Office Renovation"></div>
+        <div class="form-group"><label>Contact</label><select class="form-control" id="lead-contact"><option value="">Select...</option>${contactOpts}</select></div>
+        <div class="form-row">
+            <div class="form-group"><label>Expected Revenue</label><input class="form-control" id="lead-revenue" type="number" placeholder="0.00"></div>
+            <div class="form-group"><label>Probability %</label><input class="form-control" id="lead-prob" type="number" value="20"></div>
+        </div>
+        <div class="form-group"><label>Notes</label><textarea class="form-control" id="lead-notes"></textarea></div>
+    `, '<button class="btn btn-primary" onclick="saveLead()">Save</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+}
+
+function saveLead() {
+    const name = document.getElementById('lead-name').value.trim();
+    if (!name) { toast('Name is required','error'); return; }
+    const contactId = parseInt(document.getElementById('lead-contact').value) || null;
+    const contact = contactId ? DB.contacts.find(c=>c.id===contactId) : null;
+    DB.leads.push({
+        id: genId(), name, contact_id: contactId,
+        email: contact ? contact.email : '', phone: contact ? contact.phone : '',
+        stage: 'new', expected_revenue: parseFloat(document.getElementById('lead-revenue').value)||0,
+        probability: parseInt(document.getElementById('lead-prob').value)||20,
+        notes: document.getElementById('lead-notes').value, created_at: today()
+    });
+    closeModal(); toast('Lead created'); renderCRM();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SALES
+// ══════════════════════════════════════════════════════════════════════════════
+
+function renderSales() {
+    const orders = DB.salesOrders;
+    const totalRev = orders.reduce((s,o)=>s+orderTotal(o.lines),0);
+    const confirmed = orders.filter(o=>o.status==='confirmed').length;
+    const delivered = orders.filter(o=>o.status==='delivered').length;
+    document.getElementById('content').innerHTML = `
+        <div class="page-header"><h1 class="page-title">Sales Orders</h1><div class="page-actions"><button class="btn btn-primary" onclick="newSalesOrderForm()">+ New Order</button></div></div>
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value">${orders.length}</div></div>
+            <div class="stat-card accent"><div class="stat-label">Total Revenue</div><div class="stat-value">${money(totalRev)}</div></div>
+            <div class="stat-card success"><div class="stat-label">Confirmed</div><div class="stat-value">${confirmed}</div></div>
+            <div class="stat-card warning"><div class="stat-label">Delivered</div><div class="stat-value">${delivered}</div></div>
+        </div>
+        <div class="card"><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>Reference</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th></tr></thead><tbody>
+            ${orders.map(o=>`<tr onclick="viewSalesOrder(${o.id})"><td>${o.ref}</td><td>${o.customer_name}</td><td>${o.date}</td><td>${money(orderTotal(o.lines))}</td><td>${badge(o.status)}</td></tr>`).join('')}
+        </tbody></table></div></div></div>
+    `;
+}
+
+function viewSalesOrder(id) {
+    const o = DB.salesOrders.find(x=>x.id===id);
+    if(!o) return;
+    const total = orderTotal(o.lines);
+    const linesHtml = o.lines.map(l=>`<tr><td>${l.name}</td><td>${l.qty}</td><td>${money(l.price)}</td><td>${money(l.qty*l.price)}</td></tr>`).join('');
+    let actions = '<button class="btn btn-outline" onclick="closeModal()">Close</button>';
+    if(o.status==='draft') actions = `<button class="btn btn-success" onclick="confirmSO(${o.id})">Confirm</button>` + actions;
+    if(o.status==='confirmed') actions = `<button class="btn btn-accent" onclick="deliverSO(${o.id})">Mark Delivered</button>` + actions;
+    if(o.status==='delivered') actions = `<button class="btn btn-primary" onclick="invoiceSO(${o.id})">Create Invoice</button>` + actions;
+    openModal('Order ' + o.ref, `
+        <div class="detail-grid">
+            <div><div class="detail-field"><div class="detail-label">Customer</div><div class="detail-value">${o.customer_name}</div></div>
+                <div class="detail-field"><div class="detail-label">Date</div><div class="detail-value">${o.date}</div></div></div>
+            <div><div class="detail-field"><div class="detail-label">Status</div><div class="detail-value">${badge(o.status)}</div></div>
+                <div class="detail-field"><div class="detail-label">Total</div><div class="detail-value">${money(total)}</div></div></div>
+        </div>
+        <hr class="divider">
+        <h4 class="mb-2">Order Lines</h4>
+        <div class="table-wrapper"><table><thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>${linesHtml}</tbody></table></div>
+        ${o.notes ? '<hr class="divider"><div class="detail-field"><div class="detail-label">Notes</div><div class="detail-value">'+o.notes+'</div></div>' : ''}
+    `, actions);
+}
+
+function confirmSO(id) { const o=DB.salesOrders.find(x=>x.id===id); if(o){o.status='confirmed'; closeModal(); toast('Order confirmed'); renderSales();} }
+function deliverSO(id) { const o=DB.salesOrders.find(x=>x.id===id); if(o){o.status='delivered'; closeModal(); toast('Order delivered'); renderSales();} }
+function invoiceSO(id) {
+    const o=DB.salesOrders.find(x=>x.id===id); if(!o) return;
+    o.status='invoiced';
+    DB.invoices.push({id:genId(), ref:'INV-'+String(DB.invoices.length+1).padStart(3,'0'), type:'customer', contact_id:o.customer_id, contact_name:o.customer_name, date:today(), due_date:'2026-04-07', status:'sent', lines:o.lines.map(l=>({description:l.name+' x'+l.qty, qty:l.qty, price:l.price}))});
+    closeModal(); toast('Invoice created'); renderSales();
+}
+
+function newSalesOrderForm() {
+    const custOpts = DB.contacts.filter(c=>c.is_customer).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    const prodOpts = DB.products.filter(p=>p.type==='product').map(p=>`<option value="${p.id}">${p.name} (${money(p.price)})</option>`).join('');
+    openModal('New Sales Order', `
+        <div class="form-group"><label>Customer</label><select class="form-control" id="so-customer"><option value="">Select...</option>${custOpts}</select></div>
+        <div class="form-group"><label>Date</label><input class="form-control" id="so-date" type="date" value="${today()}"></div>
+        <hr class="divider"><h4 class="mb-2">Order Lines</h4>
+        <div id="so-lines">
+            <div class="form-row mb-2"><div class="form-group"><label>Product</label><select class="form-control so-prod">${prodOpts}</select></div><div class="form-group"><label>Qty</label><input class="form-control so-qty" type="number" value="1" min="1"></div></div>
+        </div>
+        <button class="btn btn-sm btn-outline mt-2" onclick="addSOLine()">+ Add Line</button>
+        <div class="form-group mt-4"><label>Notes</label><textarea class="form-control" id="so-notes"></textarea></div>
+    `, '<button class="btn btn-primary" onclick="saveSalesOrder()">Save</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+}
+
+function addSOLine() {
+    const prodOpts = DB.products.filter(p=>p.type==='product').map(p=>`<option value="${p.id}">${p.name} (${money(p.price)})</option>`).join('');
+    document.getElementById('so-lines').insertAdjacentHTML('beforeend', `<div class="form-row mb-2"><div class="form-group"><label>Product</label><select class="form-control so-prod">${prodOpts}</select></div><div class="form-group"><label>Qty</label><input class="form-control so-qty" type="number" value="1" min="1"></div></div>`);
+}
+
+function saveSalesOrder() {
+    const custId = parseInt(document.getElementById('so-customer').value);
+    if (!custId) { toast('Select a customer','error'); return; }
+    const cust = DB.contacts.find(c=>c.id===custId);
+    const prods = document.querySelectorAll('.so-prod');
+    const qtys = document.querySelectorAll('.so-qty');
+    const lines = [];
+    prods.forEach((sel,i) => {
+        const p = DB.products.find(x=>x.id===parseInt(sel.value));
+        if (p) lines.push({product_id:p.id, name:p.name, qty:parseInt(qtys[i].value)||1, price:p.price});
+    });
+    if (!lines.length) { toast('Add at least one line','error'); return; }
+    DB.salesOrders.push({id:genId(), ref:'SO-'+String(DB.salesOrders.length+1).padStart(3,'0'), customer_id:custId, customer_name:cust.name, date:document.getElementById('so-date').value||today(), status:'draft', lines, notes:document.getElementById('so-notes').value});
+    closeModal(); toast('Sales order created'); renderSales();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POINT OF SALE
+// ══════════════════════════════════════════════════════════════════════════════
+
+function renderPOS() {
+    const sellable = DB.products.filter(p => p.type === 'product' && p.stock > 0);
+    const cart = DB.posCart;
+    const subtotal = cart.reduce((s,c) => s + c.price * c.qty, 0);
+    const tax = subtotal * 0.08;
+    const total = subtotal + tax;
+
+    let productsHtml = sellable.map(p => `<div class="pos-product-card" onclick="addToCart(${p.id})"><div class="pos-product-icon">${p.icon}</div><div class="pos-product-name">${p.name}</div><div class="pos-product-price">${money(p.price)}</div></div>`).join('');
+
+    let cartHtml = '';
+    if (cart.length === 0) {
+        cartHtml = '<div class="empty-state"><div class="icon">&#128722;</div><p>Cart is empty</p></div>';
+    } else {
+        cartHtml = cart.map(c => `<div class="pos-cart-item"><div class="pos-cart-item-info"><div class="pos-cart-item-name">${c.name}</div><div class="pos-cart-item-price">${money(c.price)} each</div></div><div class="pos-cart-item-qty"><button onclick="changeQty(${c.product_id},-1)">-</button><span>${c.qty}</span><button onclick="changeQty(${c.product_id},1)">+</button></div><div class="pos-cart-item-subtotal">${money(c.price*c.qty)}</div></div>`).join('');
+    }
+
+    document.getElementById('content').innerHTML = `
+        <div class="page-header"><h1 class="page-title">Point of Sale</h1><div class="page-actions"><button class="btn btn-outline" onclick="clearCart()">Clear Cart</button></div></div>
+        <div class="pos-layout">
+            <div class="pos-products-grid">${productsHtml}</div>
+            <div class="pos-cart">
+                <div class="pos-cart-header">Current Order</div>
+                <div class="pos-cart-items">${cartHtml}</div>
+                <div class="pos-cart-footer">
+                    <div class="pos-totals-row"><span>Subtotal</span><span>${money(subtotal)}</span></div>
+                    <div class="pos-totals-row"><span>Tax (8%)</span><span>${money(tax)}</span></div>
+                    <div class="pos-totals-row total"><span>Total</span><span>${money(total)}</span></div>
+                    <div class="pos-payment-buttons">
+                        <button class="btn btn-success" onclick="completePOS('cash')" ${cart.length===0?'disabled':''}>&#128181; Cash</button>
+                        <button class="btn btn-primary" onclick="completePOS('card')" ${cart.length===0?'disabled':''}>&#128179; Card</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function addToCart(productId) {
+    const p = DB.products.find(x => x.id === productId);
+    if (!p) return;
+    const existing = DB.posCart.find(c => c.product_id === productId);
+    if (existing) { existing.qty++; } else { DB.posCart.push({product_id: p.id, name: p.name, price: p.price, qty: 1}); }
+    renderPOS();
+}
+
+function changeQty(productId, delta) {
+    const item = DB.posCart.find(c => c.product_id === productId);
+    if (!item) return;
+    item.qty += delta;
+    if (item.qty <= 0) DB.posCart = DB.posCart.filter(c => c.product_id !== productId);
+    renderPOS();
+}
+
+function clearCart() { DB.posCart = []; renderPOS(); }
+
+function completePOS(method) {
+    if (DB.posCart.length === 0) return;
+    const lines = DB.posCart.map(c => ({product_id: c.product_id, name: c.name, qty: c.qty, price: c.price}));
+    DB.salesOrders.push({id:genId(), ref:'POS-'+String(Date.now()).slice(-4), customer_id:null, customer_name:'Walk-in Customer', date:today(), status:'delivered', lines, notes:'POS Sale - '+method.toUpperCase()});
+    lines.forEach(l => { const p = DB.products.find(x=>x.id===l.product_id); if(p) p.stock = Math.max(0, p.stock - l.qty); });
+    DB.posCart = [];
+    toast('Payment received ('+method.toUpperCase()+')');
+    renderPOS();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INVENTORY
+// ══════════════════════════════════════════════════════════════════════════════
+
+function renderInventory() {
+    const products = DB.products;
+    const totalValue = products.reduce((s,p) => s + p.stock * p.cost, 0);
+    const lowStock = products.filter(p => p.stock < 5);
+    const categories = [...new Set(products.map(p=>p.category))];
+    document.getElementById('content').innerHTML = `
+        <div class="page-header"><h1 class="page-title">Inventory</h1></div>
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-label">Total Products</div><div class="stat-value">${products.length}</div></div>
+            <div class="stat-card accent"><div class="stat-label">Stock Value</div><div class="stat-value">${money(totalValue)}</div></div>
+            <div class="stat-card warning"><div class="stat-label">Low Stock Items</div><div class="stat-value">${lowStock.length}</div></div>
+            <div class="stat-card success"><div class="stat-label">Categories</div><div class="stat-value">${categories.length}</div></div>
+        </div>
+        <div class="card"><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>SKU</th><th>Product</th><th>Category</th><th>On Hand</th><th>Cost</th><th>Stock Value</th></tr></thead><tbody>
+            ${products.map(p=>`<tr><td>${p.sku}</td><td>${p.name}</td><td>${p.category}</td><td style="${p.stock<5?'color:var(--danger);font-weight:700':''}">${p.stock}</td><td>${money(p.cost)}</td><td>${money(p.stock*p.cost)}</td></tr>`).join('')}
+        </tbody></table></div></div></div>
+    `;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PURCHASE
+// ══════════════════════════════════════════════════════════════════════════════
+
+function renderPurchase() {
+    const orders = DB.purchaseOrders;
+    const totalSpent = orders.reduce((s,o)=>s+orderTotal(o.lines),0);
+    const pending = orders.filter(o=>o.status!=='received').length;
+    document.getElementById('content').innerHTML = `
+        <div class="page-header"><h1 class="page-title">Purchase Orders</h1><div class="page-actions"><button class="btn btn-primary" onclick="newPurchaseOrderForm()">+ New PO</button></div></div>
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-label">Total POs</div><div class="stat-value">${orders.length}</div></div>
+            <div class="stat-card accent"><div class="stat-label">Total Spent</div><div class="stat-value">${money(totalSpent)}</div></div>
+            <div class="stat-card warning"><div class="stat-label">Pending</div><div class="stat-value">${pending}</div></div>
+        </div>
+        <div class="card"><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>Reference</th><th>Vendor</th><th>Date</th><th>Total</th><th>Status</th></tr></thead><tbody>
+            ${orders.map(o=>`<tr onclick="viewPO(${o.id})"><td>${o.ref}</td><td>${o.vendor_name}</td><td>${o.date}</td><td>${money(orderTotal(o.lines))}</td><td>${badge(o.status)}</td></tr>`).join('')}
+        </tbody></table></div></div></div>
+    `;
+}
+
+function viewPO(id) {
+    const o = DB.purchaseOrders.find(x=>x.id===id);
+    if(!o) return;
+    const total = orderTotal(o.lines);
+    const linesHtml = o.lines.map(l=>`<tr><td>${l.name}</td><td>${l.qty}</td><td>${money(l.price)}</td><td>${money(l.qty*l.price)}</td></tr>`).join('');
+    let actions = '<button class="btn btn-outline" onclick="closeModal()">Close</button>';
+    if(o.status==='draft') actions = `<button class="btn btn-success" onclick="confirmPO(${o.id})">Confirm</button>` + actions;
+    if(o.status==='confirmed') actions = `<button class="btn btn-accent" onclick="receivePO(${o.id})">Mark Received</button>` + actions;
+    openModal('Purchase Order ' + o.ref, `
+        <div class="detail-grid">
+            <div><div class="detail-field"><div class="detail-label">Vendor</div><div class="detail-value">${o.vendor_name}</div></div><div class="detail-field"><div class="detail-label">Date</div><div class="detail-value">${o.date}</div></div></div>
+            <div><div class="detail-field"><div class="detail-label">Status</div><div class="detail-value">${badge(o.status)}</div></div><div class="detail-field"><div class="detail-label">Total</div><div class="detail-value">${money(total)}</div></div></div>
+        </div>
+        <hr class="divider"><h4 class="mb-2">Order Lines</h4>
+        <div class="table-wrapper"><table><thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>${linesHtml}</tbody></table></div>
+    `, actions);
+}
+
+function confirmPO(id) { const o=DB.purchaseOrders.find(x=>x.id===id); if(o){o.status='confirmed'; closeModal(); toast('PO confirmed'); renderPurchase();} }
+function receivePO(id) { const o=DB.purchaseOrders.find(x=>x.id===id); if(o){o.status='received'; closeModal(); toast('PO received'); renderPurchase();} }
+
+function newPurchaseOrderForm() {
+    const vendorOpts = DB.contacts.filter(c=>c.is_vendor).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    openModal('New Purchase Order', `
+        <div class="form-group"><label>Vendor</label><select class="form-control" id="po-vendor"><option value="">Select...</option>${vendorOpts}</select></div>
+        <div class="form-group"><label>Date</label><input class="form-control" id="po-date" type="date" value="${today()}"></div>
+        <hr class="divider"><h4 class="mb-2">Order Lines</h4>
+        <div id="po-lines">
+            <div class="form-row mb-2"><div class="form-group"><label>Item</label><input class="form-control po-item" placeholder="Item name"></div><div class="form-group"><label>Qty</label><input class="form-control po-qty" type="number" value="1"></div><div class="form-group"><label>Unit Price</label><input class="form-control po-price" type="number" value="0"></div></div>
+        </div>
+        <button class="btn btn-sm btn-outline mt-2" onclick="addPOLine()">+ Add Line</button>
+    `, '<button class="btn btn-primary" onclick="savePurchaseOrder()">Save</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+}
+
+function addPOLine() {
+    document.getElementById('po-lines').insertAdjacentHTML('beforeend', '<div class="form-row mb-2"><div class="form-group"><label>Item</label><input class="form-control po-item" placeholder="Item name"></div><div class="form-group"><label>Qty</label><input class="form-control po-qty" type="number" value="1"></div><div class="form-group"><label>Unit Price</label><input class="form-control po-price" type="number" value="0"></div></div>');
+}
+
+function savePurchaseOrder() {
+    const vendorId = parseInt(document.getElementById('po-vendor').value);
+    if (!vendorId) { toast('Select a vendor','error'); return; }
+    const vendor = DB.contacts.find(c=>c.id===vendorId);
+    const items = document.querySelectorAll('.po-item');
+    const qtys = document.querySelectorAll('.po-qty');
+    const prices = document.querySelectorAll('.po-price');
+    const lines = [];
+    items.forEach((inp,i) => {
+        if(inp.value.trim()) lines.push({name:inp.value.trim(), qty:parseInt(qtys[i].value)||1, price:parseFloat(prices[i].value)||0});
+    });
+    if (!lines.length) { toast('Add at least one line','error'); return; }
+    DB.purchaseOrders.push({id:genId(), ref:'PO-'+String(DB.purchaseOrders.length+1).padStart(3,'0'), vendor_id:vendorId, vendor_name:vendor.name, date:document.getElementById('po-date').value||today(), status:'draft', lines, notes:''});
+    closeModal(); toast('Purchase order created'); renderPurchase();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MANUFACTURING
+// ══════════════════════════════════════════════════════════════════════════════
+
+let mfgTab = 'orders';
+
+function renderManufacturing() {
+    const orders = DB.manufacturingOrders;
+    const boms = DB.boms;
+    const inProg = orders.filter(o=>o.status==='in_progress').length;
+    const done = orders.filter(o=>o.status==='done').length;
+    document.getElementById('content').innerHTML = `
+        <div class="page-header"><h1 class="page-title">Manufacturing</h1><div class="page-actions"><button class="btn btn-primary" onclick="newMfgOrderForm()">+ New MO</button></div></div>
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value">${orders.length}</div></div>
+            <div class="stat-card warning"><div class="stat-label">In Progress</div><div class="stat-value">${inProg}</div></div>
+            <div class="stat-card success"><div class="stat-label">Completed</div><div class="stat-value">${done}</div></div>
+            <div class="stat-card accent"><div class="stat-label">Active BOMs</div><div class="stat-value">${boms.length}</div></div>
+        </div>
+        <div class="tabs">
+            <div class="tab ${mfgTab==='orders'?'active':''}" onclick="mfgTab='orders';renderManufacturing()">Manufacturing Orders</div>
+            <div class="tab ${mfgTab==='boms'?'active':''}" onclick="mfgTab='boms';renderManufacturing()">Bills of Materials</div>
+        </div>
+        ${mfgTab==='orders' ? renderMfgOrders(orders) : renderBOMs(boms)}
+    `;
+}
+
+function renderMfgOrders(orders) {
+    return `<div class="card"><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>Reference</th><th>Product</th><th>Qty</th><th>Start</th><th>Status</th></tr></thead><tbody>
+        ${orders.map(o=>`<tr onclick="viewMfgOrder(${o.id})"><td>${o.ref}</td><td>${o.product_name}</td><td>${o.qty}</td><td>${o.start_date}</td><td>${badge(o.status)}</td></tr>`).join('')}
+    </tbody></table></div></div></div>`;
+}
+
+function renderBOMs(boms) {
+    return `<div class="card"><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>Product</th><th>Components</th><th>Est. Cost</th></tr></thead><tbody>
+        ${boms.map(b=>{
+            const cost = b.lines.reduce((s,l)=>s+l.qty*l.cost,0);
+            return `<tr onclick="viewBOM(${b.id})"><td>${b.product_name}</td><td>${b.lines.length} items</td><td>${money(cost)}</td></tr>`;
+        }).join('')}
+    </tbody></table></div></div></div>`;
+}
+
+function viewMfgOrder(id) {
+    const o = DB.manufacturingOrders.find(x=>x.id===id);
+    if(!o) return;
+    let actions = '<button class="btn btn-outline" onclick="closeModal()">Close</button>';
+    if(o.status==='draft') actions = `<button class="btn btn-success" onclick="mfgTransition(${o.id},'confirmed')">Confirm</button>` + actions;
+    if(o.status==='confirmed') actions = `<button class="btn btn-warning" onclick="mfgTransition(${o.id},'in_progress')">Start Production</button>` + actions;
+    if(o.status==='in_progress') actions = `<button class="btn btn-accent" onclick="mfgTransition(${o.id},'done')">Mark Done</button>` + actions;
+    const bom = o.bom_id ? DB.boms.find(b=>b.id===o.bom_id) : null;
+    openModal('Manufacturing Order ' + o.ref, `
+        <div class="detail-grid">
+            <div><div class="detail-field"><div class="detail-label">Product</div><div class="detail-value">${o.product_name}</div></div><div class="detail-field"><div class="detail-label">Quantity</div><div class="detail-value">${o.qty}</div></div></div>
+            <div><div class="detail-field"><div class="detail-label">Status</div><div class="detail-value">${badge(o.status)}</div></div><div class="detail-field"><div class="detail-label">Start Date</div><div class="detail-value">${o.start_date}</div></div></div>
+        </div>
+        ${bom ? '<hr class="divider"><h4 class="mb-2">Bill of Materials</h4><div class="table-wrapper"><table><thead><tr><th>Material</th><th>Qty</th><th>Unit</th><th>Cost</th></tr></thead><tbody>'+bom.lines.map(l=>`<tr><td>${l.material}</td><td>${l.qty}</td><td>${l.unit}</td><td>${money(l.cost)}</td></tr>`).join('')+'</tbody></table></div>' : ''}
+    `, actions);
+}
+
+function mfgTransition(id, newStatus) {
+    const o = DB.manufacturingOrders.find(x=>x.id===id);
+    if(o) {
+        o.status = newStatus;
+        if(newStatus==='done') {
+            o.end_date = today();
+            const p = DB.products.find(x=>x.id===o.product_id);
+            if(p) p.stock += o.qty;
+        }
+        closeModal(); toast('Manufacturing order updated'); renderManufacturing();
+    }
+}
+
+function viewBOM(id) {
+    const b = DB.boms.find(x=>x.id===id);
+    if(!b) return;
+    const totalCost = b.lines.reduce((s,l)=>s+l.qty*l.cost,0);
+    openModal('BOM: ' + b.product_name, `
+        <div class="detail-field"><div class="detail-label">Product</div><div class="detail-value">${b.product_name}</div></div>
+        <div class="detail-field"><div class="detail-label">Estimated Cost</div><div class="detail-value">${money(totalCost)}</div></div>
+        <hr class="divider"><h4 class="mb-2">Components</h4>
+        <div class="table-wrapper"><table><thead><tr><th>Material</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Total</th></tr></thead><tbody>
+            ${b.lines.map(l=>`<tr><td>${l.material}</td><td>${l.qty}</td><td>${l.unit}</td><td>${money(l.cost)}</td><td>${money(l.qty*l.cost)}</td></tr>`).join('')}
+        </tbody></table></div>
+    `, '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
+}
+
+function newMfgOrderForm() {
+    const prodOpts = DB.products.filter(p=>p.type==='product').map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+    openModal('New Manufacturing Order', `
+        <div class="form-group"><label>Product</label><select class="form-control" id="mo-product">${prodOpts}</select></div>
+        <div class="form-row">
+            <div class="form-group"><label>Quantity</label><input class="form-control" id="mo-qty" type="number" value="1" min="1"></div>
+            <div class="form-group"><label>Start Date</label><input class="form-control" id="mo-start" type="date" value="${today()}"></div>
+        </div>
+    `, '<button class="btn btn-primary" onclick="saveMfgOrder()">Save</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+}
+
+function saveMfgOrder() {
+    const prodId = parseInt(document.getElementById('mo-product').value);
+    const p = DB.products.find(x=>x.id===prodId);
+    if(!p) return;
+    const bom = DB.boms.find(b=>b.product_id===prodId);
+    DB.manufacturingOrders.push({id:genId(), ref:'MO-'+String(DB.manufacturingOrders.length+1).padStart(3,'0'), product_id:prodId, product_name:p.name, bom_id:bom?bom.id:null, qty:parseInt(document.getElementById('mo-qty').value)||1, status:'draft', start_date:document.getElementById('mo-start').value||today(), end_date:null});
+    closeModal(); toast('Manufacturing order created'); renderManufacturing();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ACCOUNTING
+// ══════════════════════════════════════════════════════════════════════════════
+
+let accTab = 'all';
+
+function renderAccounting() {
+    const invoices = DB.invoices;
+    const filtered = accTab==='all' ? invoices : invoices.filter(i=>i.type===(accTab==='customer'?'customer':'vendor'));
+    const custInv = invoices.filter(i=>i.type==='customer');
+    const vendInv = invoices.filter(i=>i.type==='vendor');
+    const income = custInv.reduce((s,i)=>s+orderTotal(i.lines),0);
+    const expenses = vendInv.reduce((s,i)=>s+orderTotal(i.lines),0);
+    const receivable = custInv.filter(i=>i.status!=='paid').reduce((s,i)=>s+orderTotal(i.lines),0);
+    const payable = vendInv.filter(i=>i.status!=='paid').reduce((s,i)=>s+orderTotal(i.lines),0);
+
+    document.getElementById('content').innerHTML = `
+        <div class="page-header"><h1 class="page-title">Accounting</h1><div class="page-actions"><button class="btn btn-primary" onclick="newInvoiceForm()">+ New Invoice</button></div></div>
+        <div class="stats-grid">
+            <div class="stat-card success"><div class="stat-label">Income</div><div class="stat-value">${money(income)}</div></div>
+            <div class="stat-card danger"><div class="stat-label">Expenses</div><div class="stat-value">${money(expenses)}</div></div>
+            <div class="stat-card accent"><div class="stat-label">Profit</div><div class="stat-value">${money(income-expenses)}</div></div>
+            <div class="stat-card warning"><div class="stat-label">Receivable</div><div class="stat-value">${money(receivable)}</div></div>
+            <div class="stat-card info"><div class="stat-label">Payable</div><div class="stat-value">${money(payable)}</div></div>
+        </div>
+        <div class="tabs">
+            <div class="tab ${accTab==='all'?'active':''}" onclick="accTab='all';renderAccounting()">All Invoices</div>
+            <div class="tab ${accTab==='customer'?'active':''}" onclick="accTab='customer';renderAccounting()">Customer Invoices</div>
+            <div class="tab ${accTab==='vendor'?'active':''}" onclick="accTab='vendor';renderAccounting()">Vendor Bills</div>
+        </div>
+        <div class="card"><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>Reference</th><th>Type</th><th>Contact</th><th>Date</th><th>Due Date</th><th>Total</th><th>Status</th></tr></thead><tbody>
+            ${filtered.map(i=>`<tr onclick="viewInvoice(${i.id})"><td>${i.ref}</td><td>${i.type}</td><td>${i.contact_name}</td><td>${i.date}</td><td>${i.due_date}</td><td>${money(orderTotal(i.lines))}</td><td>${badge(i.status)}</td></tr>`).join('')}
+        </tbody></table></div></div></div>
+    `;
+}
+
+function viewInvoice(id) {
+    const inv = DB.invoices.find(x=>x.id===id);
+    if(!inv) return;
+    const total = orderTotal(inv.lines);
+    const linesHtml = inv.lines.map(l=>`<tr><td>${l.description}</td><td>${l.qty}</td><td>${money(l.price)}</td><td>${money(l.qty*l.price)}</td></tr>`).join('');
+    let actions = '<button class="btn btn-outline" onclick="closeModal()">Close</button>';
+    if(inv.status==='draft') actions = `<button class="btn btn-success" onclick="invoiceTransition(${inv.id},'sent')">Send</button>` + actions;
+    if(inv.status==='sent') actions = `<button class="btn btn-accent" onclick="invoiceTransition(${inv.id},'paid')">Mark Paid</button>` + actions;
+    openModal('Invoice ' + inv.ref, `
+        <div class="detail-grid">
+            <div><div class="detail-field"><div class="detail-label">Contact</div><div class="detail-value">${inv.contact_name}</div></div><div class="detail-field"><div class="detail-label">Type</div><div class="detail-value">${inv.type}</div></div></div>
+            <div><div class="detail-field"><div class="detail-label">Date</div><div class="detail-value">${inv.date}</div></div><div class="detail-field"><div class="detail-label">Due Date</div><div class="detail-value">${inv.due_date}</div></div></div>
+        </div>
+        <div class="detail-field"><div class="detail-label">Status</div><div class="detail-value">${badge(inv.status)}</div></div>
+        <hr class="divider"><h4 class="mb-2">Lines</h4>
+        <div class="table-wrapper"><table><thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>${linesHtml}<tr style="font-weight:700"><td colspan="3" style="text-align:right">Total</td><td>${money(total)}</td></tr></tbody></table></div>
+    `, actions);
+}
+
+function invoiceTransition(id, newStatus) {
+    const inv = DB.invoices.find(x=>x.id===id);
+    if(inv) { inv.status = newStatus; closeModal(); toast('Invoice updated'); renderAccounting(); }
+}
+
+function newInvoiceForm() {
+    const contactOpts = DB.contacts.map(c=>`<option value="${c.id}">${c.name} (${c.is_customer?'Customer':'Vendor'})</option>`).join('');
+    openModal('New Invoice', `
+        <div class="form-row">
+            <div class="form-group"><label>Type</label><select class="form-control" id="inv-type"><option value="customer">Customer Invoice</option><option value="vendor">Vendor Bill</option></select></div>
+            <div class="form-group"><label>Contact</label><select class="form-control" id="inv-contact"><option value="">Select...</option>${contactOpts}</select></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Date</label><input class="form-control" id="inv-date" type="date" value="${today()}"></div>
+            <div class="form-group"><label>Due Date</label><input class="form-control" id="inv-due" type="date" value="2026-04-07"></div>
+        </div>
+        <hr class="divider"><h4 class="mb-2">Lines</h4>
+        <div id="inv-lines">
+            <div class="form-row mb-2"><div class="form-group"><label>Description</label><input class="form-control inv-desc" placeholder="Description"></div><div class="form-group"><label>Qty</label><input class="form-control inv-qty" type="number" value="1"></div><div class="form-group"><label>Price</label><input class="form-control inv-price" type="number" value="0"></div></div>
+        </div>
+        <button class="btn btn-sm btn-outline mt-2" onclick="addInvLine()">+ Add Line</button>
+    `, '<button class="btn btn-primary" onclick="saveInvoice()">Save</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+}
+
+function addInvLine() {
+    document.getElementById('inv-lines').insertAdjacentHTML('beforeend', '<div class="form-row mb-2"><div class="form-group"><label>Description</label><input class="form-control inv-desc" placeholder="Description"></div><div class="form-group"><label>Qty</label><input class="form-control inv-qty" type="number" value="1"></div><div class="form-group"><label>Price</label><input class="form-control inv-price" type="number" value="0"></div></div>');
+}
+
+function saveInvoice() {
+    const contactId = parseInt(document.getElementById('inv-contact').value);
+    if (!contactId) { toast('Select a contact','error'); return; }
+    const contact = DB.contacts.find(c=>c.id===contactId);
+    const descs = document.querySelectorAll('.inv-desc');
+    const qtys = document.querySelectorAll('.inv-qty');
+    const prices = document.querySelectorAll('.inv-price');
+    const lines = [];
+    descs.forEach((inp,i) => { if(inp.value.trim()) lines.push({description:inp.value.trim(), qty:parseInt(qtys[i].value)||1, price:parseFloat(prices[i].value)||0}); });
+    if (!lines.length) { toast('Add at least one line','error'); return; }
+    DB.invoices.push({id:genId(), ref:'INV-'+String(DB.invoices.length+1).padStart(3,'0'), type:document.getElementById('inv-type').value, contact_id:contactId, contact_name:contact.name, date:document.getElementById('inv-date').value||today(), due_date:document.getElementById('inv-due').value||'', status:'draft', lines});
+    closeModal(); toast('Invoice created'); renderAccounting();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EMAIL MARKETING
+// ══════════════════════════════════════════════════════════════════════════════
+
+let emailTab = 'campaigns';
+
+function renderEmailMarketing() {
+    const campaigns = DB.emailCampaigns;
+    const totalSent = campaigns.reduce((s,c)=>s+c.sent,0);
+    const totalOpened = campaigns.reduce((s,c)=>s+c.opened,0);
+    const totalClicked = campaigns.reduce((s,c)=>s+c.clicked,0);
+    const openRate = totalSent ? ((totalOpened/totalSent)*100).toFixed(1) : 0;
+    const clickRate = totalSent ? ((totalClicked/totalSent)*100).toFixed(1) : 0;
+
+    document.getElementById('content').innerHTML = `
+        <div class="page-header"><h1 class="page-title">Email Marketing</h1><div class="page-actions"><button class="btn btn-primary" onclick="newEmailCampaignForm()">+ New Campaign</button></div></div>
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-label">Campaigns</div><div class="stat-value">${campaigns.length}</div></div>
+            <div class="stat-card accent"><div class="stat-label">Emails Sent</div><div class="stat-value">${totalSent.toLocaleString()}</div></div>
+            <div class="stat-card success"><div class="stat-label">Open Rate</div><div class="stat-value">${openRate}%</div></div>
+            <div class="stat-card warning"><div class="stat-label">Click Rate</div><div class="stat-value">${clickRate}%</div></div>
+        </div>
+        <div class="tabs">
+            <div class="tab ${emailTab==='campaigns'?'active':''}" onclick="emailTab='campaigns';renderEmailMarketing()">Campaigns</div>
+            <div class="tab ${emailTab==='lists'?'active':''}" onclick="emailTab='lists';renderEmailMarketing()">Mailing Lists</div>
+        </div>
+        ${emailTab==='campaigns' ? renderEmailCampaigns(campaigns) : renderMailingLists()}
+    `;
+}
+
+function renderEmailCampaigns(campaigns) {
+    return `<div class="card"><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>Campaign</th><th>Subject</th><th>Date</th><th>Sent</th><th>Opened</th><th>Clicked</th><th>Status</th></tr></thead><tbody>
+        ${campaigns.map(c=>`<tr onclick="viewEmailCampaign(${c.id})"><td>${c.name}</td><td>${c.subject}</td><td>${c.date}</td><td>${c.sent.toLocaleString()}</td><td>${c.opened.toLocaleString()}</td><td>${c.clicked.toLocaleString()}</td><td>${badge(c.status)}</td></tr>`).join('')}
+    </tbody></table></div></div></div>`;
+}
+
+function renderMailingLists() {
+    return `<div class="card"><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>List Name</th><th>Subscribers</th><th>Actions</th></tr></thead><tbody>
+        ${DB.mailingLists.map(ml=>`<tr><td>${ml.name}</td><td>${ml.count}</td><td><button class="btn btn-sm btn-outline" onclick="viewMailingList(${ml.id})">View</button></td></tr>`).join('')}
+    </tbody></table></div></div></div>
+    <div class="mt-4"><button class="btn btn-outline" onclick="newMailingListForm()">+ New Mailing List</button></div>`;
+}
+
+function viewEmailCampaign(id) {
+    const c = DB.emailCampaigns.find(x=>x.id===id);
+    if(!c) return;
+    const openRate = c.sent ? ((c.opened/c.sent)*100).toFixed(1) : 0;
+    const clickRate = c.sent ? ((c.clicked/c.sent)*100).toFixed(1) : 0;
+    const list = DB.mailingLists.find(ml=>ml.id===c.list_id);
+    let actions = '<button class="btn btn-outline" onclick="closeModal()">Close</button>';
+    if(c.status==='scheduled') actions = `<button class="btn btn-success" onclick="sendEmailCampaign(${c.id})">Send Now</button>` + actions;
+    openModal(c.name, `
+        <div class="detail-grid">
+            <div><div class="detail-field"><div class="detail-label">Subject</div><div class="detail-value">${c.subject}</div></div>
+                <div class="detail-field"><div class="detail-label">Mailing List</div><div class="detail-value">${list?list.name:'-'}</div></div>
+                <div class="detail-field"><div class="detail-label">Date</div><div class="detail-value">${c.date}</div></div></div>
+            <div><div class="detail-field"><div class="detail-label">Status</div><div class="detail-value">${badge(c.status)}</div></div>
+                <div class="detail-field"><div class="detail-label">Sent</div><div class="detail-value">${c.sent.toLocaleString()}</div></div>
+                <div class="detail-field"><div class="detail-label">Open / Click Rate</div><div class="detail-value">${openRate}% / ${clickRate}%</div></div></div>
+        </div>
+    `, actions);
+}
+
+function sendEmailCampaign(id) {
+    const c = DB.emailCampaigns.find(x=>x.id===id);
+    if(!c) return;
+    const list = DB.mailingLists.find(ml=>ml.id===c.list_id);
+    c.status = 'sent';
+    c.sent = list ? list.count * 150 : 500;
+    c.opened = Math.floor(c.sent * 0.62);
+    c.clicked = Math.floor(c.sent * 0.18);
+    closeModal(); toast('Campaign sent!'); renderEmailMarketing();
+}
+
+function newEmailCampaignForm() {
+    const listOpts = DB.mailingLists.map(ml=>`<option value="${ml.id}">${ml.name} (${ml.count})</option>`).join('');
+    openModal('New Email Campaign', `
+        <div class="form-group"><label>Campaign Name</label><input class="form-control" id="ec-name" placeholder="Campaign name"></div>
+        <div class="form-group"><label>Subject Line</label><input class="form-control" id="ec-subject" placeholder="Email subject"></div>
+        <div class="form-row">
+            <div class="form-group"><label>Mailing List</label><select class="form-control" id="ec-list">${listOpts}</select></div>
+            <div class="form-group"><label>Scheduled Date</label><input class="form-control" id="ec-date" type="date" value="${today()}"></div>
+        </div>
+        <div class="form-group"><label>Email Content</label><textarea class="form-control" id="ec-content" placeholder="Write your email content..."></textarea></div>
+    `, '<button class="btn btn-primary" onclick="saveEmailCampaign()">Save</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+}
+
+function saveEmailCampaign() {
+    const name = document.getElementById('ec-name').value.trim();
+    if(!name) { toast('Name is required','error'); return; }
+    DB.emailCampaigns.push({
+        id: genId(), name, subject: document.getElementById('ec-subject').value||name,
+        status: 'scheduled', sent:0, opened:0, clicked:0,
+        date: document.getElementById('ec-date').value||today(),
+        list_id: parseInt(document.getElementById('ec-list').value)||1
+    });
+    closeModal(); toast('Email campaign created'); renderEmailMarketing();
+}
+
+function viewMailingList(id) {
+    const ml = DB.mailingLists.find(x=>x.id===id);
+    if(!ml) return;
+    const contacts = ml.contacts.map(cid => DB.contacts.find(c=>c.id===cid)).filter(Boolean);
+    openModal(ml.name, `
+        <div class="detail-field"><div class="detail-label">Subscribers</div><div class="detail-value">${ml.count}</div></div>
+        <hr class="divider">
+        <div class="table-wrapper"><table><thead><tr><th>Name</th><th>Email</th><th>Company</th></tr></thead><tbody>
+            ${contacts.map(c=>`<tr><td>${c.name}</td><td>${c.email}</td><td>${c.company||'-'}</td></tr>`).join('')}
+        </tbody></table></div>
+    `, '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
+}
+
+function newMailingListForm() {
+    const contactChecks = DB.contacts.filter(c=>c.opt_in_email).map(c=>`<label style="display:block;padding:4px 0"><input type="checkbox" class="ml-contact" value="${c.id}"> ${c.name} (${c.email})</label>`).join('');
+    openModal('New Mailing List', `
+        <div class="form-group"><label>List Name</label><input class="form-control" id="ml-name" placeholder="List name"></div>
+        <div class="form-group"><label>Select Contacts</label><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:8px">${contactChecks}</div></div>
+    `, '<button class="btn btn-primary" onclick="saveMailingList()">Save</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+}
+
+function saveMailingList() {
+    const name = document.getElementById('ml-name').value.trim();
+    if(!name) { toast('Name is required','error'); return; }
+    const checks = document.querySelectorAll('.ml-contact:checked');
+    const contacts = Array.from(checks).map(c=>parseInt(c.value));
+    DB.mailingLists.push({id:genId(), name, count:contacts.length, contacts});
+    closeModal(); toast('Mailing list created'); renderEmailMarketing();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SMS MARKETING
+// ══════════════════════════════════════════════════════════════════════════════
+
+function renderSMSMarketing() {
+    const campaigns = DB.smsCampaigns;
+    const totalSent = campaigns.reduce((s,c)=>s+c.sent,0);
+    document.getElementById('content').innerHTML = `
+        <div class="page-header"><h1 class="page-title">SMS Marketing</h1><div class="page-actions"><button class="btn btn-primary" onclick="newSMSCampaignForm()">+ New Campaign</button></div></div>
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-label">Campaigns</div><div class="stat-value">${campaigns.length}</div></div>
+            <div class="stat-card accent"><div class="stat-label">Total SMS Sent</div><div class="stat-value">${totalSent.toLocaleString()}</div></div>
+        </div>
+        <div class="card"><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>Campaign</th><th>Message</th><th>Date</th><th>Sent</th><th>Status</th></tr></thead><tbody>
+            ${campaigns.map(c=>`<tr onclick="viewSMSCampaign(${c.id})"><td>${c.name}</td><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.message}</td><td>${c.date}</td><td>${c.sent.toLocaleString()}</td><td>${badge(c.status)}</td></tr>`).join('')}
+        </tbody></table></div></div></div>
+    `;
+}
+
+function viewSMSCampaign(id) {
+    const c = DB.smsCampaigns.find(x=>x.id===id);
+    if(!c) return;
+    let actions = '<button class="btn btn-outline" onclick="closeModal()">Close</button>';
+    if(c.status==='scheduled') actions = `<button class="btn btn-success" onclick="sendSMSCampaign(${c.id})">Send Now</button>` + actions;
+    openModal(c.name, `
+        <div class="detail-grid">
+            <div><div class="detail-field"><div class="detail-label">Date</div><div class="detail-value">${c.date}</div></div><div class="detail-field"><div class="detail-label">Status</div><div class="detail-value">${badge(c.status)}</div></div></div>
+            <div><div class="detail-field"><div class="detail-label">Sent</div><div class="detail-value">${c.sent.toLocaleString()}</div></div></div>
+        </div>
+        <hr class="divider"><div class="detail-field"><div class="detail-label">Message</div><div class="detail-value" style="background:#f9f9f9;padding:12px;border-radius:var(--radius)">${c.message}</div></div>
+        <div class="sms-char-count">${c.message.length} characters</div>
+    `, actions);
+}
+
+function sendSMSCampaign(id) {
+    const c = DB.smsCampaigns.find(x=>x.id===id);
+    if(!c) return;
+    c.status = 'sent';
+    c.sent = DB.contacts.filter(co=>co.opt_in_sms).length * 120;
+    closeModal(); toast('SMS campaign sent!'); renderSMSMarketing();
+}
+
+function newSMSCampaignForm() {
+    openModal('New SMS Campaign', `
+        <div class="form-group"><label>Campaign Name</label><input class="form-control" id="sms-name" placeholder="Campaign name"></div>
+        <div class="form-group"><label>Scheduled Date</label><input class="form-control" id="sms-date" type="date" value="${today()}"></div>
+        <div class="form-group"><label>Message</label><textarea class="form-control" id="sms-message" maxlength="160" placeholder="SMS message (160 chars max)" oninput="document.getElementById('sms-count').textContent=this.value.length+'/160'"></textarea><div class="sms-char-count" id="sms-count">0/160</div></div>
+    `, '<button class="btn btn-primary" onclick="saveSMSCampaign()">Save</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+}
+
+function saveSMSCampaign() {
+    const name = document.getElementById('sms-name').value.trim();
+    if(!name) { toast('Name is required','error'); return; }
+    DB.smsCampaigns.push({
+        id: genId(), name, message: document.getElementById('sms-message').value||'',
+        status: 'scheduled', sent: 0, date: document.getElementById('sms-date').value||today()
+    });
+    closeModal(); toast('SMS campaign created'); renderSMSMarketing();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONTACTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+let contactTab = 'all';
+
+function renderContacts() {
+    const contacts = DB.contacts;
+    const filtered = contactTab==='all' ? contacts : contactTab==='customers' ? contacts.filter(c=>c.is_customer) : contacts.filter(c=>c.is_vendor);
+
+    document.getElementById('content').innerHTML = `
+        <div class="page-header"><h1 class="page-title">Contacts</h1><div class="page-actions"><button class="btn btn-primary" onclick="newContactForm()">+ New Contact</button></div></div>
+        <div class="tabs">
+            <div class="tab ${contactTab==='all'?'active':''}" onclick="contactTab='all';renderContacts()">All (${contacts.length})</div>
+            <div class="tab ${contactTab==='customers'?'active':''}" onclick="contactTab='customers';renderContacts()">Customers (${contacts.filter(c=>c.is_customer).length})</div>
+            <div class="tab ${contactTab==='vendors'?'active':''}" onclick="contactTab='vendors';renderContacts()">Vendors (${contacts.filter(c=>c.is_vendor).length})</div>
+        </div>
+        <div class="card"><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>City</th><th>Type</th></tr></thead><tbody>
+            ${filtered.map(c=>`<tr onclick="viewContact(${c.id})"><td>${c.name}</td><td>${c.company||'-'}</td><td>${c.email||'-'}</td><td>${c.phone||'-'}</td><td>${c.city||'-'}</td><td>${c.is_customer&&c.is_vendor?'Both':c.is_customer?'Customer':'Vendor'}</td></tr>`).join('')}
+        </tbody></table></div></div></div>
+    `;
+}
+
+function viewContact(id) {
+    const c = DB.contacts.find(x=>x.id===id);
+    if(!c) return;
+    openModal(c.name, `
+        <div class="detail-grid">
+            <div>
+                <div class="detail-field"><div class="detail-label">Company</div><div class="detail-value">${c.company||'-'}</div></div>
+                <div class="detail-field"><div class="detail-label">Email</div><div class="detail-value">${c.email||'-'}</div></div>
+                <div class="detail-field"><div class="detail-label">Phone</div><div class="detail-value">${c.phone||'-'}</div></div>
+                <div class="detail-field"><div class="detail-label">Address</div><div class="detail-value">${c.address||'-'}</div></div>
+            </div>
+            <div>
+                <div class="detail-field"><div class="detail-label">City / State</div><div class="detail-value">${c.city||'-'}, ${c.state||'-'}</div></div>
+                <div class="detail-field"><div class="detail-label">Type</div><div class="detail-value">${c.is_customer?'Customer ':' '}${c.is_vendor?'Vendor':''}</div></div>
+                <div class="detail-field"><div class="detail-label">Email Opt-in</div><div class="detail-value">${c.opt_in_email?'Yes':'No'}</div></div>
+                <div class="detail-field"><div class="detail-label">SMS Opt-in</div><div class="detail-value">${c.opt_in_sms?'Yes':'No'}</div></div>
+            </div>
+        </div>
+        ${c.notes ? '<hr class="divider"><div class="detail-field"><div class="detail-label">Notes</div><div class="detail-value">'+c.notes+'</div></div>' : ''}
+    `, '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
+}
+
+function newContactForm() {
+    openModal('New Contact', `
+        <div class="form-row">
+            <div class="form-group"><label>Name</label><input class="form-control" id="ct-name" placeholder="Full name"></div>
+            <div class="form-group"><label>Company</label><input class="form-control" id="ct-company" placeholder="Company"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Email</label><input class="form-control" id="ct-email" type="email" placeholder="Email"></div>
+            <div class="form-group"><label>Phone</label><input class="form-control" id="ct-phone" placeholder="Phone"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>City</label><input class="form-control" id="ct-city" placeholder="City"></div>
+            <div class="form-group"><label>State</label><input class="form-control" id="ct-state" placeholder="State"></div>
+        </div>
+        <div class="form-group"><label>Address</label><input class="form-control" id="ct-address" placeholder="Address"></div>
+        <div class="form-row">
+            <div class="form-group"><label><input type="checkbox" id="ct-customer" checked> Customer</label></div>
+            <div class="form-group"><label><input type="checkbox" id="ct-vendor"> Vendor</label></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label><input type="checkbox" id="ct-email-opt" checked> Email Opt-in</label></div>
+            <div class="form-group"><label><input type="checkbox" id="ct-sms-opt" checked> SMS Opt-in</label></div>
+        </div>
+        <div class="form-group"><label>Notes</label><textarea class="form-control" id="ct-notes"></textarea></div>
+    `, '<button class="btn btn-primary" onclick="saveContact()">Save</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+}
+
+function saveContact() {
+    const name = document.getElementById('ct-name').value.trim();
+    if(!name) { toast('Name is required','error'); return; }
+    DB.contacts.push({
+        id: genId(), name,
+        company: document.getElementById('ct-company').value||null,
+        email: document.getElementById('ct-email').value||null,
+        phone: document.getElementById('ct-phone').value||null,
+        city: document.getElementById('ct-city').value||null,
+        state: document.getElementById('ct-state').value||null,
+        address: document.getElementById('ct-address').value||null,
+        is_customer: document.getElementById('ct-customer').checked,
+        is_vendor: document.getElementById('ct-vendor').checked,
+        opt_in_email: document.getElementById('ct-email-opt').checked,
+        opt_in_sms: document.getElementById('ct-sms-opt').checked,
+        notes: document.getElementById('ct-notes').value||null
+    });
+    closeModal(); toast('Contact created'); renderContacts();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PRODUCTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+let productCategoryFilter = 'All';
+
+function renderProducts() {
+    const products = DB.products;
+    const categories = ['All', ...new Set(products.map(p=>p.category))];
+    const filtered = productCategoryFilter==='All' ? products : products.filter(p=>p.category===productCategoryFilter);
+
+    document.getElementById('content').innerHTML = `
+        <div class="page-header"><h1 class="page-title">Products</h1><div class="page-actions"><button class="btn btn-primary" onclick="newProductForm()">+ New Product</button></div></div>
+        <div class="tabs">
+            ${categories.map(c=>`<div class="tab ${productCategoryFilter===c?'active':''}" onclick="productCategoryFilter='${c}';renderProducts()">${c}</div>`).join('')}
+        </div>
+        <div class="card"><div class="card-body"><div class="table-wrapper"><table><thead><tr><th>SKU</th><th>Product</th><th>Category</th><th>Price</th><th>Cost</th><th>Stock</th></tr></thead><tbody>
+            ${filtered.map(p=>`<tr onclick="viewProduct(${p.id})"><td>${p.sku}</td><td>${p.icon} ${p.name}</td><td>${p.category}</td><td>${money(p.price)}</td><td>${money(p.cost)}</td><td>${p.stock}</td></tr>`).join('')}
+        </tbody></table></div></div></div>
+    `;
+}
+
+function viewProduct(id) {
+    const p = DB.products.find(x=>x.id===id);
+    if(!p) return;
+    openModal(p.name, `
+        <div style="text-align:center;font-size:48px;margin-bottom:16px">${p.icon}</div>
+        <div class="detail-grid">
+            <div>
+                <div class="detail-field"><div class="detail-label">SKU</div><div class="detail-value">${p.sku}</div></div>
+                <div class="detail-field"><div class="detail-label">Category</div><div class="detail-value">${p.category}</div></div>
+                <div class="detail-field"><div class="detail-label">Type</div><div class="detail-value">${p.type}</div></div>
+            </div>
+            <div>
+                <div class="detail-field"><div class="detail-label">Sale Price</div><div class="detail-value">${money(p.price)}</div></div>
+                <div class="detail-field"><div class="detail-label">Cost</div><div class="detail-value">${money(p.cost)}</div></div>
+                <div class="detail-field"><div class="detail-label">On Hand</div><div class="detail-value">${p.stock}</div></div>
+            </div>
+        </div>
+        <hr class="divider">
+        <div class="detail-field"><div class="detail-label">Stock Value</div><div class="detail-value">${money(p.stock * p.cost)}</div></div>
+        <div class="detail-field"><div class="detail-label">Margin</div><div class="detail-value">${((1-p.cost/p.price)*100).toFixed(1)}%</div></div>
+    `, '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
+}
+
+function newProductForm() {
+    const cats = [...new Set(DB.products.map(p=>p.category))];
+    const catOpts = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+    openModal('New Product', `
+        <div class="form-row">
+            <div class="form-group"><label>Product Name</label><input class="form-control" id="pd-name" placeholder="Product name"></div>
+            <div class="form-group"><label>SKU</label><input class="form-control" id="pd-sku" placeholder="SKU-XXX"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Category</label><select class="form-control" id="pd-category">${catOpts}</select></div>
+            <div class="form-group"><label>Type</label><select class="form-control" id="pd-type"><option value="product">Product</option><option value="raw">Raw Material</option></select></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Sale Price</label><input class="form-control" id="pd-price" type="number" step="0.01" placeholder="0.00"></div>
+            <div class="form-group"><label>Cost</label><input class="form-control" id="pd-cost" type="number" step="0.01" placeholder="0.00"></div>
+        </div>
+        <div class="form-group"><label>Initial Stock</label><input class="form-control" id="pd-stock" type="number" value="0"></div>
+    `, '<button class="btn btn-primary" onclick="saveProduct()">Save</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+}
+
+function saveProduct() {
+    const name = document.getElementById('pd-name').value.trim();
+    if(!name) { toast('Name is required','error'); return; }
+    DB.products.push({
+        id: genId(), name,
+        sku: document.getElementById('pd-sku').value || 'PRD-'+genId(),
+        category: document.getElementById('pd-category').value,
+        type: document.getElementById('pd-type').value,
+        price: parseFloat(document.getElementById('pd-price').value)||0,
+        cost: parseFloat(document.getElementById('pd-cost').value)||0,
+        stock: parseInt(document.getElementById('pd-stock').value)||0,
+        icon: '&#9642;'
+    });
+    closeModal(); toast('Product created'); renderProducts();
+}
+
+// ── Init ────────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+    navigate('dashboard');
+});
+
+document.getElementById('modal-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeModal();
+});
+
+</script>
+</body>
 </html>
