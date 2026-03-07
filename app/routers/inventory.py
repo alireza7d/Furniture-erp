@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, cast, Date
+from datetime import datetime, timedelta
 from app.database import get_db
 from app.models import Warehouse, StockMove, Product
 
@@ -59,10 +60,14 @@ async def create_stock_move(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/moves")
-def list_moves(product_id: int = None, db: Session = Depends(get_db)):
+def list_moves(product_id: int = None, type: str = None, warehouse_id: int = None, db: Session = Depends(get_db)):
     q = db.query(StockMove)
     if product_id:
         q = q.filter(StockMove.product_id == product_id)
+    if type:
+        q = q.filter(StockMove.type == type)
+    if warehouse_id:
+        q = q.filter(StockMove.warehouse_id == warehouse_id)
     return q.order_by(StockMove.date.desc()).limit(200).all()
 
 
@@ -88,3 +93,44 @@ def inventory_dashboard(db: Session = Depends(get_db)):
         "low_stock_items": low_stock,
         "warehouses": warehouses,
     }
+
+
+@router.get("/overview")
+def inventory_overview(db: Session = Depends(get_db)):
+    """Odoo-style inventory overview: operation cards per warehouse with 7-day bar charts."""
+    warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).all()
+    op_types = [
+        {"key": "in", "label": "Receipts", "color": "#28a745"},
+        {"key": "out", "label": "Delivery Orders", "color": "#F59E0B"},
+        {"key": "transfer", "label": "Internal Transfers", "color": "#8B5CF6"},
+        {"key": "adjustment", "label": "Stock Adjustments", "color": "#17a2b8"},
+    ]
+    cards = []
+    today = datetime.utcnow().date()
+    for wh in warehouses:
+        for op in op_types:
+            # count total pending/recent moves
+            total = db.query(func.count(StockMove.id)).filter(
+                StockMove.warehouse_id == wh.id,
+                StockMove.type == op["key"]
+            ).scalar()
+            # last 7 days daily counts for bar chart
+            bars = []
+            for i in range(6, -1, -1):
+                day = today - timedelta(days=i)
+                cnt = db.query(func.count(StockMove.id)).filter(
+                    StockMove.warehouse_id == wh.id,
+                    StockMove.type == op["key"],
+                    cast(StockMove.date, Date) == day
+                ).scalar()
+                bars.append(cnt)
+            cards.append({
+                "warehouse_id": wh.id,
+                "warehouse_name": wh.name,
+                "type": op["key"],
+                "label": op["label"],
+                "color": op["color"],
+                "total": total,
+                "bars": bars,
+            })
+    return cards

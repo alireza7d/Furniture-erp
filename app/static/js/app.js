@@ -555,28 +555,98 @@ async function payInvoice(id) {
 
 // ── Inventory Module ────────────────────────────────────────────────────────
 
+let invTab = 'overview';
+
 async function renderInventory(el) {
-    const [stock, dash] = await Promise.all([api('/api/inventory/stock'), api('/api/inventory/dashboard')]);
     el.innerHTML = '<div class="page-header"><h1 class="page-title">Inventory</h1>' +
         '<div class="page-actions"><button class="btn btn-primary" onclick="showStockAdjustment()">+ Stock Adjustment</button></div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-label">Total Products</div><div class="stat-value">' + fmtN(dash.total_products) + '</div></div>' +
-            '<div class="stat-card accent"><div class="stat-label">Stock Value</div><div class="stat-value">' + fmt(dash.total_stock_value) + '</div></div>' +
-            '<div class="stat-card warning"><div class="stat-label">Low Stock Items</div><div class="stat-value">' + dash.low_stock_items.length + '</div></div>' +
-            '<div class="stat-card info"><div class="stat-label">Warehouses</div><div class="stat-value">' + fmtN(dash.warehouses) + '</div></div>' +
+        '<div class="inv-tabs">' +
+            '<button class="inv-tab' + (invTab === 'overview' ? ' active' : '') + '" onclick="invTab=\'overview\';renderInventory(document.getElementById(\'content\'))">Overview</button>' +
+            '<button class="inv-tab' + (invTab === 'stock' ? ' active' : '') + '" onclick="invTab=\'stock\';renderInventory(document.getElementById(\'content\'))">Stock Levels</button>' +
+            '<button class="inv-tab' + (invTab === 'moves' ? ' active' : '') + '" onclick="invTab=\'moves\';renderInventory(document.getElementById(\'content\'))">Moves History</button>' +
         '</div>' +
-        '<div class="card"><div class="card-header">Stock Levels</div><div class="table-wrapper"><table><thead><tr>' +
-            '<th>SKU</th><th>Product</th><th>Category</th><th>Cost Price</th><th>Sale Price</th><th>On Hand</th><th>Value</th><th>Actions</th>' +
-        '</tr></thead><tbody>' +
-        stock.map(s => '<tr><td>' + escHtml(s.sku || '') + '</td><td><strong>' + escHtml(s.product_name) + '</strong></td>' +
-            '<td>' + escHtml(s.category || '') + '</td>' +
-            '<td>' + fmt(s.cost_price) + '</td>' +
-            '<td>' + fmt(s.sale_price) + '</td>' +
-            '<td><span style="color:' + (s.on_hand <= 5 ? 'var(--danger)' : 'var(--success)') + ';font-weight:600;">' + s.on_hand + '</span></td>' +
-            '<td>' + fmt(s.cost_value) + '</td>' +
-            '<td><button class="btn btn-outline btn-sm" onclick="editProduct(' + s.product_id + ')">Edit</button></td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>';
+        '<div id="inv-content"></div>';
+    const container = document.getElementById('inv-content');
+    if (invTab === 'overview') await renderInvOverview(container);
+    else if (invTab === 'stock') await renderInvStock(container);
+    else if (invTab === 'moves') await renderInvMoves(container);
+}
+
+async function renderInvOverview(el) {
+    const [cards, dash] = await Promise.all([api('/api/inventory/overview'), api('/api/inventory/dashboard')]);
+    el.innerHTML = '<div class="stats-grid">' +
+        '<div class="stat-card"><div class="stat-label">Total Products</div><div class="stat-value">' + fmtN(dash.total_products) + '</div></div>' +
+        '<div class="stat-card accent"><div class="stat-label">Stock Value</div><div class="stat-value">' + fmt(dash.total_stock_value) + '</div></div>' +
+        '<div class="stat-card warning"><div class="stat-label">Low Stock Items</div><div class="stat-value">' + dash.low_stock_items.length + '</div></div>' +
+        '<div class="stat-card info"><div class="stat-label">Warehouses</div><div class="stat-value">' + fmtN(dash.warehouses) + '</div></div>' +
+    '</div>' +
+    '<div class="inv-overview-grid">' +
+    cards.map(c => {
+        const maxBar = Math.max(...c.bars, 1);
+        return '<div class="inv-op-card">' +
+            '<div class="inv-op-card-title" style="color:' + c.color + '">' + escHtml(c.label) + '</div>' +
+            '<div class="inv-op-card-sub">' + escHtml(c.warehouse_name) + '</div>' +
+            '<div class="inv-op-card-count">' + c.total + ' operation' + (c.total !== 1 ? 's' : '') + '</div>' +
+            '<button class="btn-open" style="background:' + c.color + '" onclick="openInvMoves(\'' + c.type + '\',' + c.warehouse_id + ')">Open</button>' +
+            '<div class="inv-op-card-chart">' +
+                c.bars.map(b => '<div class="inv-op-card-bar' + (b > 0 ? ' has-data' : '') + '" style="height:' + Math.max(b / maxBar * 60, 4) + 'px;background:' + c.color + '"></div>').join('') +
+            '</div>' +
+        '</div>';
+    }).join('') +
+    '</div>';
+}
+
+async function renderInvStock(el) {
+    const stock = await api('/api/inventory/stock');
+    el.innerHTML = '<div class="card"><div class="card-header">Stock Levels</div><div class="table-wrapper"><table><thead><tr>' +
+        '<th>SKU</th><th>Product</th><th>Category</th><th>Cost Price</th><th>Sale Price</th><th>On Hand</th><th>Value</th><th>Actions</th>' +
+    '</tr></thead><tbody>' +
+    stock.map(s => '<tr><td>' + escHtml(s.sku || '') + '</td><td><strong>' + escHtml(s.product_name) + '</strong></td>' +
+        '<td>' + escHtml(s.category || '') + '</td>' +
+        '<td>' + fmt(s.cost_price) + '</td>' +
+        '<td>' + fmt(s.sale_price) + '</td>' +
+        '<td><span style="color:' + (s.on_hand <= 5 ? 'var(--danger)' : 'var(--success)') + ';font-weight:600;">' + s.on_hand + '</span></td>' +
+        '<td>' + fmt(s.cost_value) + '</td>' +
+        '<td><button class="btn btn-outline btn-sm" onclick="editProduct(' + s.product_id + ')">Edit</button></td></tr>'
+    ).join('') +
+    '</tbody></table></div></div>';
+}
+
+async function renderInvMoves(el, typeFilter, whFilter) {
+    let url = '/api/inventory/moves';
+    const params = [];
+    if (typeFilter) params.push('type=' + typeFilter);
+    if (whFilter) params.push('warehouse_id=' + whFilter);
+    if (params.length) url += '?' + params.join('&');
+    const moves = await api(url);
+    el.innerHTML = '<div class="card"><div class="card-header">Stock Moves</div><div class="table-wrapper"><table><thead><tr>' +
+        '<th>Date</th><th>Type</th><th>Product</th><th>Quantity</th><th>Reference</th><th>Notes</th>' +
+    '</tr></thead><tbody>' +
+    (moves.length ? moves.map(m => {
+        const d = m.date ? new Date(m.date).toLocaleDateString() : '';
+        const typeColors = {in:'var(--success)',out:'var(--warning)',transfer:'#8B5CF6',adjustment:'var(--info)'};
+        return '<tr><td>' + d + '</td>' +
+            '<td><span class="badge" style="background:' + (typeColors[m.type] || '#999') + ';color:#fff;">' + escHtml(m.type) + '</span></td>' +
+            '<td>' + (m.product_id || '') + '</td>' +
+            '<td><strong>' + m.quantity + '</strong></td>' +
+            '<td>' + escHtml(m.reference || '') + '</td>' +
+            '<td>' + escHtml(m.notes || '') + '</td></tr>';
+    }).join('') : '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);">No stock moves found</td></tr>') +
+    '</tbody></table></div></div>';
+}
+
+function openInvMoves(type, whId) {
+    invTab = 'moves';
+    const el = document.getElementById('content');
+    el.innerHTML = '<div class="page-header"><h1 class="page-title">Inventory</h1>' +
+        '<div class="page-actions"><button class="btn btn-primary" onclick="showStockAdjustment()">+ Stock Adjustment</button></div></div>' +
+        '<div class="inv-tabs">' +
+            '<button class="inv-tab" onclick="invTab=\'overview\';renderInventory(document.getElementById(\'content\'))">Overview</button>' +
+            '<button class="inv-tab" onclick="invTab=\'stock\';renderInventory(document.getElementById(\'content\'))">Stock Levels</button>' +
+            '<button class="inv-tab active" onclick="invTab=\'moves\';renderInventory(document.getElementById(\'content\'))">Moves History</button>' +
+        '</div>' +
+        '<div id="inv-content"></div>';
+    renderInvMoves(document.getElementById('inv-content'), type, whId);
 }
 
 async function showStockAdjustment() {
