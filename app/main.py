@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
 from app.database import engine, Base
-from app.routers import contacts, products, crm, sales, pos, accounting, inventory, purchase, manufacturing, marketing
+from app.routers import contacts, products, crm, sales, pos, accounting, inventory, purchase, manufacturing, marketing, todo
 from app.seed import seed
 
 # Create tables
@@ -27,6 +27,7 @@ app.include_router(inventory.router)
 app.include_router(purchase.router)
 app.include_router(manufacturing.router)
 app.include_router(marketing.router)
+app.include_router(todo.router)
 
 
 @app.get("/", response_class=HTMLResponse)

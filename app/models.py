@@ -476,6 +476,22 @@ class EmailCampaign(Base):
 
 # ── SMS Marketing Module ──────────────────────────────────────────────────────
 
+# ── To-do Module ─────────────────────────────────────────────────────────────
+
+class TodoItem(Base):
+    __tablename__ = "todo_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(300), nullable=False)
+    description = Column(Text)
+    stage = Column(String(20), default="inbox")  # inbox, today, this_week, this_month, later, done, cancelled
+    priority = Column(Integer, default=0)  # 0=none, 1, 2, 3 stars
+    deadline = Column(Date, nullable=True)
+    assigned_to = Column(String(100))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class SMSCampaign(Base):
     __tablename__ = "sms_campaigns"
 

@@ -281,6 +281,18 @@ def seed():
                         debit_account="Accounts Payable", credit_account="Bank",
                         amount=4675.00))
 
+    # ── To-dos ──────────────────────────────────────────────────────────────────
+    db.add_all([
+        TodoItem(title="Welcome Administrator!", stage="inbox", priority=0),
+        TodoItem(title="Review new purchase orders", stage="today", priority=2,
+                 deadline=date.today()),
+        TodoItem(title="Update product pricing for Q2", stage="this_week", priority=1,
+                 deadline=date.today() + timedelta(days=3)),
+        TodoItem(title="Schedule warehouse inventory count", stage="this_month", priority=1,
+                 deadline=date.today() + timedelta(days=14)),
+        TodoItem(title="Plan showroom renovation", stage="later", priority=0),
+    ])
+
     db.commit()
     db.close()
     print("Database seeded successfully with sample furniture data!")

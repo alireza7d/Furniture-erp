@@ -45,7 +45,8 @@ function pageTitle(p) {
     const map = { dashboard: 'Dashboard', crm: 'CRM', sales: 'Sales', pos: 'Point of Sale',
         accounting: 'Accounting', inventory: 'Inventory', purchase: 'Purchase',
         manufacturing: 'Manufacturing', 'email-marketing': 'Email Marketing',
-        'sms-marketing': 'SMS Marketing', contacts: 'Contacts', products: 'Products' };
+        'sms-marketing': 'SMS Marketing', contacts: 'Contacts', products: 'Products',
+        todo: 'To-do' };
     return map[p] || p;
 }
 
@@ -89,6 +90,7 @@ async function loadPage(page) {
             case 'sms-marketing': await renderSMSMarketing(el); break;
             case 'contacts': await renderContacts(el); break;
             case 'products': await renderProducts(el); break;
+            case 'todo': await renderTodo(el); break;
             default: el.innerHTML = '<div class="empty-state"><p>Page not found</p></div>';
         }
     } catch (e) {
@@ -1319,6 +1321,201 @@ async function deleteProduct(id) {
     if (!confirm('Archive this product?')) return;
     await api('/api/products/' + id, { method: 'DELETE' });
     closeModal(); toast('Product archived'); navigate('products');
+}
+
+// ── To-do Module ────────────────────────────────────────────────────────────
+
+const TODO_STAGES = [
+    { key: 'inbox', label: 'Inbox' },
+    { key: 'today', label: 'Today' },
+    { key: 'this_week', label: 'This Week' },
+    { key: 'this_month', label: 'This Month' },
+    { key: 'later', label: 'Later' },
+];
+const TODO_CLOSED = [
+    { key: 'done', label: 'Done' },
+    { key: 'cancelled', label: 'Cancelled' },
+];
+
+async function renderTodo(el) {
+    const todos = await api('/api/todo/');
+    const byStage = {};
+    [...TODO_STAGES, ...TODO_CLOSED].forEach(s => byStage[s.key] = []);
+    todos.forEach(t => {
+        if (byStage[t.stage]) byStage[t.stage].push(t);
+        else byStage['inbox'].push(t);
+    });
+
+    el.innerHTML = '<div class="page-header">' +
+        '<h1 class="page-title">To-do</h1>' +
+        '<div class="page-actions">' +
+            '<button class="btn btn-primary" onclick="showNewTodo(\'inbox\')">New</button>' +
+            '<span style="font-size:12px;color:var(--text-muted);margin-left:8px;">To-dos</span>' +
+        '</div></div>' +
+        '<div class="card" style="overflow:hidden;">' +
+        '<div class="todo-board">' +
+        TODO_STAGES.map(s => {
+            const items = byStage[s.key];
+            return '<div class="todo-column" data-stage="' + s.key + '">' +
+                '<div class="todo-col-header">' +
+                    '<span>' + s.label + '</span>' +
+                    '<div style="display:flex;align-items:center;gap:8px;">' +
+                        '<span class="count' + (items.length ? ' has-items' : '') + '">' + items.length + '</span>' +
+                        '<button class="todo-col-add" onclick="showNewTodo(\'' + s.key + '\')" title="Add">+</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="todo-col-progress"><div class="todo-col-progress-bar" style="width:' + (items.length ? '100' : '0') + '%"></div></div>' +
+                '<div class="todo-col-body">' +
+                    items.map(t => renderTodoCard(t)).join('') +
+                '</div>' +
+            '</div>';
+        }).join('') +
+        TODO_CLOSED.map(s => {
+            const items = byStage[s.key];
+            return '<div class="todo-column-collapsed" onclick="showClosedTodos(\'' + s.key + '\',\'' + s.label + '\')" title="' + s.label + ' (' + items.length + ')">' +
+                '<div class="todo-col-collapsed-count">' + items.length + '</div>' +
+                '<div class="todo-col-collapsed-label">' + s.label + '</div>' +
+            '</div>';
+        }).join('') +
+        '</div></div>';
+}
+
+function renderTodoCard(t) {
+    const stars = [1, 2, 3].map(i =>
+        '<button class="todo-star' + (i <= (t.priority || 0) ? ' filled' : '') + '" onclick="event.stopPropagation();setTodoPriority(' + t.id + ',' + i + ')">' +
+        (i <= (t.priority || 0) ? '&#9733;' : '&#9734;') + '</button>'
+    ).join('');
+    let deadlineHtml = '';
+    if (t.deadline) {
+        const dl = new Date(t.deadline);
+        const now = new Date(); now.setHours(0,0,0,0);
+        const overdue = dl < now;
+        deadlineHtml = '<div class="todo-card-deadline' + (overdue ? ' overdue' : '') + '">' + dl.toLocaleDateString() + '</div>';
+    }
+    return '<div class="todo-card" onclick="showEditTodo(' + t.id + ')">' +
+        '<div class="todo-card-title">' + escHtml(t.title) + '</div>' +
+        deadlineHtml +
+        '<div class="todo-card-footer">' +
+            '<div class="todo-stars">' + stars + '</div>' +
+            '<div class="todo-card-actions">' +
+                '<button title="Schedule" onclick="event.stopPropagation();showScheduleTodo(' + t.id + ')">&#128339;</button>' +
+                '<button class="btn-done" title="Mark done" onclick="event.stopPropagation();moveTodo(' + t.id + ',\'done\')">&#9745;</button>' +
+            '</div>' +
+        '</div>' +
+    '</div>';
+}
+
+function showNewTodo(stage) {
+    openModal('New To-do', '<form id="todo-form">' +
+        '<div class="form-group"><label>Title</label><input name="title" class="form-control" required placeholder="e.g. Review quarterly report"></div>' +
+        '<div class="form-group"><label>Description</label><textarea name="description" class="form-control" rows="3"></textarea></div>' +
+        '<div class="form-row">' +
+            '<div class="form-group"><label>Stage</label><select name="stage" class="form-control">' +
+                TODO_STAGES.map(s => '<option value="' + s.key + '"' + (s.key === stage ? ' selected' : '') + '>' + s.label + '</option>').join('') +
+            '</select></div>' +
+            '<div class="form-group"><label>Deadline</label><input name="deadline" type="date" class="form-control"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+            '<div class="form-group"><label>Priority</label><select name="priority" class="form-control">' +
+                '<option value="0">None</option><option value="1">Low</option><option value="2">Medium</option><option value="3">High</option>' +
+            '</select></div>' +
+            '<div class="form-group"><label>Assigned To</label><input name="assigned_to" class="form-control" placeholder="e.g. Administrator"></div>' +
+        '</div>' +
+    '</form>',
+    '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="saveTodo()">Create</button>');
+}
+
+async function saveTodo() {
+    const data = getFormData('todo-form');
+    data.priority = parseInt(data.priority) || 0;
+    if (!data.deadline) delete data.deadline;
+    await api('/api/todo/', { method: 'POST', body: data });
+    closeModal(); toast('To-do created'); navigate('todo');
+}
+
+async function showEditTodo(id) {
+    const todos = await api('/api/todo/');
+    const t = todos.find(x => x.id === id);
+    if (!t) return;
+    openModal('Edit To-do', '<form id="todo-form">' +
+        '<div class="form-group"><label>Title</label><input name="title" class="form-control" value="' + escHtml(t.title) + '"></div>' +
+        '<div class="form-group"><label>Description</label><textarea name="description" class="form-control" rows="3">' + escHtml(t.description || '') + '</textarea></div>' +
+        '<div class="form-row">' +
+            '<div class="form-group"><label>Stage</label><select name="stage" class="form-control">' +
+                [...TODO_STAGES, ...TODO_CLOSED].map(s => '<option value="' + s.key + '"' + (s.key === t.stage ? ' selected' : '') + '>' + s.label + '</option>').join('') +
+            '</select></div>' +
+            '<div class="form-group"><label>Deadline</label><input name="deadline" type="date" class="form-control" value="' + (t.deadline || '') + '"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+            '<div class="form-group"><label>Priority</label><select name="priority" class="form-control">' +
+                [0,1,2,3].map(i => '<option value="' + i + '"' + (i === t.priority ? ' selected' : '') + '>' + ['None','Low','Medium','High'][i] + '</option>').join('') +
+            '</select></div>' +
+            '<div class="form-group"><label>Assigned To</label><input name="assigned_to" class="form-control" value="' + escHtml(t.assigned_to || '') + '"></div>' +
+        '</div>' +
+    '</form>',
+    '<button class="btn btn-danger" onclick="deleteTodo(' + id + ')" style="margin-right:auto;">Delete</button>' +
+    '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="updateTodo(' + id + ')">Save</button>');
+}
+
+async function updateTodo(id) {
+    const data = getFormData('todo-form');
+    data.priority = parseInt(data.priority) || 0;
+    if (!data.deadline) data.deadline = null;
+    await api('/api/todo/' + id, { method: 'PUT', body: data });
+    closeModal(); toast('To-do updated'); navigate('todo');
+}
+
+async function deleteTodo(id) {
+    await api('/api/todo/' + id, { method: 'DELETE' });
+    closeModal(); toast('To-do deleted'); navigate('todo');
+}
+
+async function setTodoPriority(id, priority) {
+    const todos = await api('/api/todo/');
+    const t = todos.find(x => x.id === id);
+    const newP = (t && t.priority === priority) ? 0 : priority;
+    await api('/api/todo/' + id, { method: 'PUT', body: { priority: newP } });
+    navigate('todo');
+}
+
+async function moveTodo(id, stage) {
+    await api('/api/todo/' + id, { method: 'PUT', body: { stage: stage } });
+    toast(stage === 'done' ? 'Marked as done!' : 'Moved to ' + stage);
+    navigate('todo');
+}
+
+function showScheduleTodo(id) {
+    openModal('Schedule To-do', '<form id="schedule-form">' +
+        '<div class="form-group"><label>Move to</label><select name="stage" class="form-control">' +
+            TODO_STAGES.map(s => '<option value="' + s.key + '">' + s.label + '</option>').join('') +
+        '</select></div>' +
+        '<div class="form-group"><label>Deadline</label><input name="deadline" type="date" class="form-control"></div>' +
+    '</form>',
+    '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="applyScheduleTodo(' + id + ')">Apply</button>');
+}
+
+async function applyScheduleTodo(id) {
+    const data = getFormData('schedule-form');
+    if (!data.deadline) delete data.deadline;
+    await api('/api/todo/' + id, { method: 'PUT', body: data });
+    closeModal(); toast('Scheduled'); navigate('todo');
+}
+
+function showClosedTodos(stage, label) {
+    api('/api/todo/?stage=' + stage).then(todos => {
+        openModal(label + ' (' + todos.length + ')', todos.length ?
+            '<div style="max-height:400px;overflow-y:auto;">' +
+            todos.map(t => '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">' +
+                '<span style="font-size:13.5px;">' + escHtml(t.title) + '</span>' +
+                '<button class="btn btn-outline btn-sm" onclick="moveTodo(' + t.id + ',\'inbox\');closeModal();">Reopen</button>' +
+            '</div>').join('') +
+            '</div>' :
+            '<p class="text-muted" style="text-align:center;padding:20px;">No items</p>',
+        '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
+    });
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────

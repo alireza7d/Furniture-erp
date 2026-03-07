@@ -973,6 +973,216 @@ select.form-control {
     font-weight: 600;
 }
 
+/* ── To-do Kanban Board (Odoo-style) ────────────────────────────────────────── */
+
+.todo-board {
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 16px;
+    min-height: calc(100vh - 180px);
+}
+
+.todo-column {
+    min-width: 240px;
+    flex: 1;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+}
+
+.todo-column:last-child {
+    border-right: none;
+}
+
+.todo-col-header {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    background: #F9FAFB;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.todo-col-header .count {
+    background: var(--text-muted);
+    color: #fff;
+    font-size: 11px;
+    padding: 0 7px;
+    border-radius: 10px;
+    font-weight: 600;
+    min-width: 18px;
+    text-align: center;
+}
+
+.todo-col-header .count.has-items {
+    background: var(--primary);
+}
+
+.todo-col-add {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 0 4px;
+    line-height: 1;
+    transition: color 0.15s;
+}
+
+.todo-col-add:hover {
+    color: var(--primary);
+}
+
+.todo-col-body {
+    flex: 1;
+    padding: 8px;
+    overflow-y: auto;
+}
+
+.todo-card {
+    background: var(--bg-white);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+}
+
+.todo-card:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+.todo-card-title {
+    font-weight: 600;
+    font-size: 13.5px;
+    margin-bottom: 6px;
+    color: var(--text);
+}
+
+.todo-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.todo-stars {
+    display: flex;
+    gap: 1px;
+}
+
+.todo-star {
+    cursor: pointer;
+    font-size: 14px;
+    color: #D1D5DB;
+    background: none;
+    border: none;
+    padding: 0 1px;
+    line-height: 1;
+    transition: color 0.15s;
+}
+
+.todo-star.filled {
+    color: #F59E0B;
+}
+
+.todo-star:hover {
+    color: #F59E0B;
+}
+
+.todo-card-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.todo-card-actions button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 2px;
+    line-height: 1;
+    transition: color 0.15s;
+}
+
+.todo-card-actions button:hover {
+    color: var(--primary);
+}
+
+.todo-card-actions .btn-done:hover {
+    color: var(--success);
+}
+
+.todo-card-deadline {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.todo-card-deadline.overdue {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+/* Collapsed columns for Done / Cancelled */
+.todo-column-collapsed {
+    min-width: 36px;
+    max-width: 36px;
+    border-right: 1px solid var(--border);
+    background: #F9FAFB;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.todo-column-collapsed:hover {
+    background: #F0F0F0;
+}
+
+.todo-column-collapsed:last-child {
+    border-right: none;
+}
+
+.todo-col-collapsed-label {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 12px 0;
+    white-space: nowrap;
+}
+
+.todo-col-collapsed-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Progress bar under column header */
+.todo-col-progress {
+    height: 3px;
+    background: var(--border);
+}
+
+.todo-col-progress-bar {
+    height: 100%;
+    background: var(--primary);
+    transition: width 0.3s;
+}
+
 /* ── Misc ────────────────────────────────────────────────────────────────────── */
 
 .divider {
