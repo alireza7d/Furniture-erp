@@ -1129,37 +1129,95 @@ async function sendSMSCampaign(id) {
 
 // ── Contacts Module ─────────────────────────────────────────────────────────
 
+let contactsPage = 1;
+let contactsPerPage = 20;
+let contactsFilter = 'all';
+let contactsSearch = '';
+
 async function renderContacts(el) {
     const contacts = await api('/api/contacts');
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Contacts</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewContact()">+ New Contact</button></div></div>' +
-        '<div class="tabs">' +
-            '<div class="tab active" onclick="filterContactsTab(this,&apos;all&apos;)">All</div>' +
-            '<div class="tab" onclick="filterContactsTab(this,&apos;customer&apos;)">Customers</div>' +
-            '<div class="tab" onclick="filterContactsTab(this,&apos;vendor&apos;)">Vendors</div>' +
+    let filtered = contacts;
+    if (contactsFilter === 'customer') filtered = contacts.filter(c => c.is_customer);
+    else if (contactsFilter === 'vendor') filtered = contacts.filter(c => c.is_vendor);
+    if (contactsSearch) {
+        const q = contactsSearch.toLowerCase();
+        filtered = filtered.filter(c => (c.name||'').toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || (c.phone||'').toLowerCase().includes(q) || (c.company||'').toLowerCase().includes(q));
+    }
+    const totalItems = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / contactsPerPage));
+    if (contactsPage > totalPages) contactsPage = totalPages;
+    const start = (contactsPage - 1) * contactsPerPage;
+    const pageItems = filtered.slice(start, start + contactsPerPage);
+    const rangeStart = totalItems ? start + 1 : 0;
+    const rangeEnd = Math.min(start + contactsPerPage, totalItems);
+
+    el.innerHTML = '<div class="contacts-toolbar">' +
+        '<div class="contacts-toolbar-left">' +
+            '<button class="btn btn-accent" onclick="showNewContact()">New</button>' +
+            '<span class="contacts-breadcrumb">Contacts</span>' +
         '</div>' +
-        '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>City</th><th>Type</th>' +
-        '</tr></thead><tbody id="contacts-tbody">' +
-        contacts.map(c => '<tr class="contact-row" data-cust="' + c.is_customer + '" data-vend="' + c.is_vendor + '" onclick="showContactDetail(' + c.id + ')">' +
-            '<td><strong>' + escHtml(c.name) + '</strong></td>' +
-            '<td>' + escHtml(c.company || '') + '</td>' +
-            '<td>' + escHtml(c.email || '') + '</td>' +
-            '<td>' + escHtml(c.phone || '') + '</td>' +
-            '<td>' + escHtml(c.city || '') + '</td>' +
-            '<td>' + (c.is_customer ? '<span class="badge badge-confirmed">Customer</span> ' : '') + (c.is_vendor ? '<span class="badge badge-proposition">Vendor</span>' : '') + '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>';
+        '<div class="contacts-toolbar-center">' +
+            '<div class="contacts-search-box">' +
+                '<span class="contacts-search-icon">&#128269;</span>' +
+                '<input type="text" class="contacts-search-input" placeholder="Search..." value="' + escHtml(contactsSearch) + '" oninput="contactsSearch=this.value;contactsPage=1;renderContacts(document.getElementById(\'content\'))">' +
+            '</div>' +
+        '</div>' +
+        '<div class="contacts-toolbar-right">' +
+            '<span class="contacts-paging">' + rangeStart + '-' + rangeEnd + ' / ' + totalItems + '</span>' +
+            '<button class="contacts-paging-btn" onclick="contactsPageNav(-1)" ' + (contactsPage <= 1 ? 'disabled' : '') + '>&lsaquo;</button>' +
+            '<button class="contacts-paging-btn" onclick="contactsPageNav(1)" ' + (contactsPage >= totalPages ? 'disabled' : '') + '>&rsaquo;</button>' +
+        '</div>' +
+    '</div>' +
+    '<div class="card" style="overflow:hidden;border-radius:0;">' +
+        '<table class="contacts-table"><thead><tr>' +
+            '<th style="width:32px;"><input type="checkbox" onchange="toggleAllContacts(this)"></th>' +
+            '<th>Name</th><th>Email</th><th>Phone</th><th>Activities</th><th>Country</th>' +
+        '</tr></thead><tbody>' +
+        (pageItems.length ? pageItems.map(c => {
+            const initials = contactInitials(c.name);
+            const color = contactAvatarColor(c.name);
+            return '<tr class="contact-row" onclick="showContactDetail(' + c.id + ')">' +
+                '<td style="width:32px;" onclick="event.stopPropagation()"><input type="checkbox" class="contact-cb" value="' + c.id + '"></td>' +
+                '<td><div class="contact-name-cell"><span class="contact-avatar" style="background:' + color + '">' + initials + '</span><span>' + escHtml(c.name) + '</span></div></td>' +
+                '<td class="contact-email">' + escHtml(c.email || '') + '</td>' +
+                '<td>' + escHtml(c.phone || '') + '</td>' +
+                '<td><span class="contact-activity-icon" title="Schedule activity">&#9201;</span></td>' +
+                '<td>' + escHtml(c.country || '') + '</td>' +
+            '</tr>';
+        }).join('') : '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);">No contacts found</td></tr>') +
+        '</tbody></table>' +
+    '</div>';
+}
+
+function contactInitials(name) {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.substring(0, 1).toUpperCase();
+}
+
+function contactAvatarColor(name) {
+    const colors = ['#714B67','#00A09D','#F59E0B','#DC3545','#17a2b8','#28a745','#8B5CF6','#6366F1','#EC4899','#F97316'];
+    let hash = 0;
+    for (let i = 0; i < (name||'').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+}
+
+function contactsPageNav(dir) {
+    contactsPage += dir;
+    renderContacts(document.getElementById('content'));
+}
+
+function toggleAllContacts(master) {
+    document.querySelectorAll('.contact-cb').forEach(cb => cb.checked = master.checked);
 }
 
 function filterContactsTab(tab, type) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
-    document.querySelectorAll('.contact-row').forEach(r => {
-        if (type === 'all') r.style.display = '';
-        else if (type === 'customer') r.style.display = r.dataset.cust === 'True' ? '' : 'none';
-        else r.style.display = r.dataset.vend === 'True' ? '' : 'none';
-    });
+    contactsFilter = type;
+    contactsPage = 1;
+    renderContacts(document.getElementById('content'));
 }
 
 async function showNewContact() {
