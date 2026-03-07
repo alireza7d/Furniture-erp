@@ -136,30 +136,185 @@ async function renderDashboard(el) {
 
 // ── CRM Module ──────────────────────────────────────────────────────────────
 
+let crmView = 'kanban';
+const CRM_STAGES = ['new', 'qualified', 'proposition', 'won', 'lost'];
+const CRM_STAGE_LABELS = { new: 'New', qualified: 'Qualified', proposition: 'Proposition', won: 'Won', lost: 'Lost' };
+const CRM_STAGE_COLORS = { new: 'var(--accent)', qualified: 'var(--info)', proposition: 'var(--warning)', won: 'var(--success)', lost: 'var(--danger)' };
+
 async function renderCRM(el) {
     const pipeline = await api('/api/crm/pipeline');
-    const stages = ['new', 'qualified', 'proposition', 'won', 'lost'];
-    const stageLabels = { new: 'New', qualified: 'Qualified', proposition: 'Proposition', won: 'Won', lost: 'Lost' };
+    const allLeads = [];
+    CRM_STAGES.forEach(s => { (pipeline[s]?.leads || []).forEach(l => { l._stage = s; allLeads.push(l); }); });
 
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">CRM Pipeline</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewLeadForm()">+ New Lead</button></div></div>' +
-        '<div class="kanban-board">' +
-        stages.map(s => {
-            const d = pipeline[s] || { leads: [], count: 0, revenue: 0 };
-            return '<div class="kanban-column"><div class="kanban-column-header">' + stageLabels[s] +
-                '<span class="count">' + d.count + '</span></div><div class="kanban-cards">' +
-                d.leads.map(l => '<div class="kanban-card" onclick="showLeadDetail(' + l.id + ')">' +
-                    '<div class="kanban-card-title">' + escHtml(l.title) + '</div>' +
-                    '<div class="kanban-card-sub">' + escHtml(l.contact ? l.contact.name : 'No contact') + '</div>' +
-                    '<div class="kanban-card-amount">' + fmt(l.expected_revenue) + '</div></div>'
-                ).join('') +
-                '</div></div>';
-        }).join('') + '</div>';
+    el.innerHTML = '<div class="crm-toolbar">' +
+        '<div class="crm-toolbar-left">' +
+            '<button class="btn btn-accent" onclick="showNewLeadForm()">New</button>' +
+            '<span class="crm-breadcrumb">Pipeline</span>' +
+        '</div>' +
+        '<div class="crm-toolbar-center">' +
+            '<div class="contacts-search-box">' +
+                '<span class="contacts-search-icon">&#128269;</span>' +
+                '<input type="text" class="contacts-search-input" placeholder="Search..." id="crm-search" oninput="crmSearchFilter()">' +
+            '</div>' +
+        '</div>' +
+        '<div class="crm-toolbar-right">' +
+            '<div class="crm-view-switcher">' +
+                '<button class="crm-view-btn' + (crmView==='kanban'?' active':'') + '" onclick="crmView=\'kanban\';navigate(\'crm\')" title="Kanban">&#9871;</button>' +
+                '<button class="crm-view-btn' + (crmView==='list'?' active':'') + '" onclick="crmView=\'list\';navigate(\'crm\')" title="List">&#9776;</button>' +
+                '<button class="crm-view-btn' + (crmView==='graph'?' active':'') + '" onclick="crmView=\'graph\';navigate(\'crm\')" title="Graph">&#9670;</button>' +
+            '</div>' +
+        '</div>' +
+    '</div>' +
+    '<div id="crm-content"></div>';
+
+    const container = document.getElementById('crm-content');
+    if (crmView === 'kanban') renderCRMKanban(container, pipeline);
+    else if (crmView === 'list') renderCRMList(container, allLeads);
+    else if (crmView === 'graph') renderCRMGraph(container, pipeline, allLeads);
 }
 
-async function showNewLeadForm() {
+function renderCRMKanban(el, pipeline) {
+    el.innerHTML = '<div class="crm-kanban">' +
+    CRM_STAGES.map(s => {
+        const d = pipeline[s] || { leads: [], count: 0, revenue: 0 };
+        return '<div class="crm-kanban-col">' +
+            '<div class="crm-kanban-col-header">' +
+                '<span>' + CRM_STAGE_LABELS[s] + '</span>' +
+                '<div style="display:flex;align-items:center;gap:8px;">' +
+                    '<span class="crm-col-total">' + fmt(d.revenue) + '</span>' +
+                    '<button class="todo-col-add" onclick="showNewLeadForm(\'' + s + '\')">+</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="crm-kanban-col-progress"><div class="crm-kanban-col-progress-bar" style="width:' + (d.count ? '100' : '0') + '%;background:' + CRM_STAGE_COLORS[s] + '"></div></div>' +
+            '<div class="crm-kanban-col-body">' +
+                d.leads.map(l => renderCRMCard(l)).join('') +
+            '</div>' +
+        '</div>';
+    }).join('') + '</div>';
+}
+
+function renderCRMCard(l) {
+    const contactName = l.contact ? l.contact.name : 'No contact';
+    const initials = contactInitials(contactName);
+    const color = contactAvatarColor(contactName);
+    const probColor = l.probability >= 70 ? 'var(--success)' : l.probability >= 40 ? 'var(--warning)' : 'var(--danger)';
+    const stars = [1, 2, 3].map(i => {
+        const prio = l.probability >= 70 ? 3 : l.probability >= 40 ? 2 : 1;
+        return '<span style="color:' + (i <= prio ? '#F59E0B' : '#555') + ';font-size:12px;">&#9733;</span>';
+    }).join('');
+
+    return '<div class="crm-card" onclick="showLeadDetail(' + l.id + ')">' +
+        '<div class="crm-card-ref">' + escHtml(l.title) + '</div>' +
+        '<div class="crm-card-amount">' + fmt(l.expected_revenue) + '</div>' +
+        '<div class="crm-card-contact">' +
+            '<span class="contact-avatar" style="background:' + color + ';width:22px;height:22px;min-width:22px;font-size:10px;">' + initials + '</span>' +
+            '<span>' + escHtml(contactName) + '</span>' +
+        '</div>' +
+        (l.source ? '<div class="crm-card-source">' + escHtml(l.source) + '</div>' : '') +
+        '<div class="crm-card-footer">' +
+            '<div class="crm-card-stars">' + stars + '</div>' +
+            '<div class="crm-card-badges">' +
+                '<span class="crm-prob-badge" style="background:' + probColor + '">' + l.probability + '%</span>' +
+                '<span class="crm-card-icon" title="Activities">&#128172;</span>' +
+                '<span class="crm-card-icon" title="Schedule">&#128339;</span>' +
+            '</div>' +
+        '</div>' +
+    '</div>';
+}
+
+function renderCRMList(el, leads) {
+    el.innerHTML = '<div class="card" style="overflow:hidden;border-radius:0;">' +
+        '<table class="contacts-table"><thead><tr>' +
+            '<th style="width:32px;"><input type="checkbox"></th>' +
+            '<th>Opportunity</th><th>Contact Name</th><th>Email</th><th>Salesperson</th><th>Expected Revenue</th><th>Stage</th>' +
+        '</tr></thead><tbody>' +
+        (leads.length ? leads.map(l => {
+            const contactName = l.contact ? l.contact.name : '';
+            const email = l.contact ? l.contact.email || '' : '';
+            return '<tr onclick="showLeadDetail(' + l.id + ')">' +
+                '<td style="width:32px;" onclick="event.stopPropagation()"><input type="checkbox"></td>' +
+                '<td><strong>' + escHtml(l.title) + '</strong></td>' +
+                '<td><div class="contact-name-cell"><span class="contact-avatar" style="background:' + contactAvatarColor(contactName) + ';width:22px;height:22px;min-width:22px;font-size:10px;">' + contactInitials(contactName) + '</span><span>' + escHtml(contactName) + '</span></div></td>' +
+                '<td class="contact-email">' + escHtml(email) + '</td>' +
+                '<td>' + escHtml(l.assigned_to || '') + '</td>' +
+                '<td><strong>' + fmt(l.expected_revenue) + '</strong></td>' +
+                '<td>' + badge(l._stage || l.status) + '</td>' +
+            '</tr>';
+        }).join('') : '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted);">No leads found</td></tr>') +
+        '</tbody></table></div>';
+}
+
+function renderCRMGraph(el, pipeline, allLeads) {
+    // Revenue by stage bar chart
+    const maxRev = Math.max(...CRM_STAGES.map(s => pipeline[s]?.revenue || 0), 1);
+    // Revenue by salesperson
+    const bySalesperson = {};
+    allLeads.forEach(l => {
+        const sp = l.assigned_to || l.contact?.name || 'Unassigned';
+        bySalesperson[sp] = (bySalesperson[sp] || 0) + (l.expected_revenue || 0);
+    });
+    const spEntries = Object.entries(bySalesperson).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const maxSp = Math.max(...spEntries.map(e => e[1]), 1);
+    const spColors = ['#714B67','#00A09D','#F59E0B','#DC3545','#17a2b8','#28a745','#8B5CF6','#EC4899'];
+
+    el.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' +
+        '<div class="card"><div class="card-header">Revenue by Stage</div><div class="card-body">' +
+            '<div class="crm-chart">' +
+            CRM_STAGES.map((s, i) => {
+                const rev = pipeline[s]?.revenue || 0;
+                const h = Math.max(rev / maxRev * 200, 4);
+                return '<div class="crm-chart-bar-wrap">' +
+                    '<div class="crm-chart-bar" style="height:' + h + 'px;background:' + CRM_STAGE_COLORS[s] + '"></div>' +
+                    '<div class="crm-chart-label">' + CRM_STAGE_LABELS[s] + '</div>' +
+                    '<div class="crm-chart-value">' + fmt(rev) + '</div>' +
+                '</div>';
+            }).join('') +
+            '</div>' +
+        '</div></div>' +
+        '<div class="card"><div class="card-header">Revenue by Salesperson</div><div class="card-body">' +
+            '<div class="crm-chart">' +
+            spEntries.map((e, i) => {
+                const h = Math.max(e[1] / maxSp * 200, 4);
+                return '<div class="crm-chart-bar-wrap">' +
+                    '<div class="crm-chart-bar" style="height:' + h + 'px;background:' + spColors[i % spColors.length] + '"></div>' +
+                    '<div class="crm-chart-label">' + escHtml(e[0].split(' ')[0]) + '</div>' +
+                    '<div class="crm-chart-value">' + fmt(e[1]) + '</div>' +
+                '</div>';
+            }).join('') +
+            '</div>' +
+        '</div></div>' +
+    '</div>' +
+    '<div class="card mt-4"><div class="card-header">Pipeline Summary</div><div class="card-body">' +
+        '<div class="stats-grid">' +
+        CRM_STAGES.map(s => {
+            const d = pipeline[s] || { count: 0, revenue: 0 };
+            return '<div class="stat-card" style="border-left-color:' + CRM_STAGE_COLORS[s] + '">' +
+                '<div class="stat-label">' + CRM_STAGE_LABELS[s] + '</div>' +
+                '<div class="stat-value">' + d.count + '</div>' +
+                '<div class="stat-sub">' + fmt(d.revenue) + '</div>' +
+            '</div>';
+        }).join('') +
+        '</div>' +
+    '</div></div>';
+}
+
+function crmSearchFilter() {
+    const q = (document.getElementById('crm-search')?.value || '').toLowerCase();
+    if (crmView === 'kanban') {
+        document.querySelectorAll('.crm-card').forEach(card => {
+            card.style.display = card.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    } else if (crmView === 'list') {
+        document.querySelectorAll('.contacts-table tbody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    }
+}
+
+async function showNewLeadForm(defaultStage) {
     const contacts = await api('/api/contacts?type=customer');
     const opts = contacts.map(c => '<option value="' + c.id + '">' + escHtml(c.name) + '</option>').join('');
+    const stageOpts = CRM_STAGES.map(s => '<option value="' + s + '"' + (s === (defaultStage||'new') ? ' selected' : '') + '>' + CRM_STAGE_LABELS[s] + '</option>').join('');
     openModal('New Lead',
         '<form id="lead-form">' +
         '<div class="form-group"><label>Title</label><input name="title" class="form-control" required></div>' +
@@ -171,6 +326,7 @@ async function showNewLeadForm() {
             '<div class="form-group"><label>Expected Revenue</label><input name="expected_revenue" type="number" class="form-control" value="0"></div>' +
             '<div class="form-group"><label>Probability %</label><input name="probability" type="number" class="form-control" value="10" min="0" max="100"></div>' +
         '</div>' +
+        '<div class="form-group"><label>Stage</label><select name="status" class="form-control">' + stageOpts + '</select></div>' +
         '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control"></textarea></div>' +
         '</form>',
         '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
