@@ -48,7 +48,8 @@ function pageTitle(p) {
         'sms-marketing': 'SMS Marketing', 'social-marketing': 'Social Marketing',
         contacts: 'Contacts', products: 'Products',
         todo: 'To-do', dashboards: 'Dashboards', documents: 'Documents',
-        project: 'Project', planning: 'Planning' };
+        project: 'Project', planning: 'Planning', barcode: 'Barcode',
+        employees: 'Employees' };
     return map[p] || p;
 }
 
@@ -98,6 +99,8 @@ async function loadPage(page) {
             case 'project': await renderProject(el); break;
             case 'planning': await renderPlanning(el); break;
             case 'social-marketing': await renderSocialMarketing(el); break;
+            case 'barcode': await renderBarcode(el); break;
+            case 'employees': await renderEmployees(el); break;
             default: el.innerHTML = '<div class="empty-state"><p>Page not found</p></div>';
         }
     } catch (e) {
@@ -1474,56 +1477,120 @@ async function receivePO(id) { await api('/api/purchase/orders/' + id + '/receiv
 
 // ── Manufacturing Module ────────────────────────────────────────────────────
 
+let mfgView = 'list';
+let mfgSubPage = 'mfg-orders';
+
+function mfgModuleNav(activePage, extra) {
+    extra = extra || '';
+    return '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#16a34a;">&#9881;</div>Manufacturing</div>' +
+        '<a class="pos-nav-link' + (activePage === 'mfg-overview' ? ' active' : '') + '" onclick="mfgSubPage=\'mfg-overview\';renderMfgSubPage()">Overview</a>' +
+        '<div class="pos-nav-dropdown"><a class="pos-nav-link' + (activePage === 'mfg-orders' ? ' active' : '') + '">Operations</a>' +
+            '<div class="pos-nav-dropdown-menu">' +
+                '<a onclick="mfgSubPage=\'mfg-orders\';renderMfgSubPage()">Manufacturing Orders</a>' +
+                '<a onclick="showNewBOM()">Bills of Materials</a>' +
+            '</div></div>' +
+        '<a class="pos-nav-link' + (activePage === 'mfg-planning' ? ' active' : '') + '" onclick="mfgSubPage=\'mfg-planning\';renderMfgSubPage()">Planning</a>' +
+        '<a class="pos-nav-link">Products</a>' +
+        '<div class="pos-nav-dropdown"><a class="pos-nav-link' + (activePage === 'mfg-reporting' ? ' active' : '') + '">Reporting</a>' +
+            '<div class="pos-nav-dropdown-menu"><a>Production Analysis</a><a>Overall Equipment Effectiveness</a></div></div>' +
+        '<a class="pos-nav-link' + (activePage === 'mfg-config' ? ' active' : '') + '" onclick="mfgSubPage=\'mfg-config\';renderMfgSubPage()">Configuration</a>' +
+        extra +
+    '</div>';
+}
+
+async function renderMfgSubPage() {
+    const el = document.getElementById('content');
+    switch (mfgSubPage) {
+        case 'mfg-orders': await renderManufacturing(el); break;
+        case 'mfg-overview': await renderManufacturing(el); break;
+        case 'mfg-config': await renderMfgWorkCenters(el); break;
+        case 'mfg-planning': await renderManufacturing(el); break;
+        default: await renderManufacturing(el);
+    }
+}
+
 async function renderManufacturing(el) {
     const [orders, boms, dash] = await Promise.all([
         api('/api/manufacturing/orders'), api('/api/manufacturing/bom'), api('/api/manufacturing/dashboard')
     ]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Manufacturing</h1>' +
-        '<div class="page-actions">' +
-            '<button class="btn btn-outline" onclick="showNewBOM()">+ New BOM</button>' +
-            '<button class="btn btn-primary" onclick="showNewMO()">+ New MO</button>' +
-        '</div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value">' + fmtN(dash.total_orders) + '</div></div>' +
-            '<div class="stat-card warning"><div class="stat-label">In Progress</div><div class="stat-value">' + fmtN(dash.in_progress) + '</div></div>' +
-            '<div class="stat-card success"><div class="stat-label">Completed</div><div class="stat-value">' + fmtN(dash.completed) + '</div></div>' +
-            '<div class="stat-card info"><div class="stat-label">Active BOMs</div><div class="stat-value">' + fmtN(dash.active_boms) + '</div></div>' +
+    const products = ['Volutpat blandit', 'Nisi morbi', 'Laoreet id', 'Integer vitae', 'Viverra nam', 'In massa'];
+
+    const rightSection = '<div class="pos-nav-right">' +
+        '<span class="pos-filter-tag">&#9660; To Do <span class="close">&times;</span></span>' +
+        '<input type="text" placeholder="Search...">' +
+        '<div class="pos-nav-views">' +
+            '<button' + (mfgView === 'list' ? ' class="active"' : '') + ' onclick="mfgView=\'list\';renderManufacturing(document.getElementById(\'content\'))">&#9776;</button>' +
+            '<button' + (mfgView === 'kanban' ? ' class="active"' : '') + ' onclick="mfgView=\'kanban\';renderManufacturing(document.getElementById(\'content\'))">&#9638;</button>' +
+            '<button>&#128197;</button><button>&#9783;</button><button>&#128202;</button><button>&#9881;</button>' +
         '</div>' +
-        '<div class="tabs">' +
-            '<div class="tab active" onclick="showMfgTab(this,&apos;orders&apos;)">Manufacturing Orders</div>' +
-            '<div class="tab" onclick="showMfgTab(this,&apos;bom&apos;)">Bills of Materials</div>' +
-        '</div>' +
-        '<div id="mfg-orders" class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Reference</th><th>Product</th><th>Qty</th><th>Status</th><th>Start</th><th>Actions</th>' +
+    '</div>';
+
+    let content = '';
+    if (mfgView === 'list') {
+        content = '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
+            '<th><input type="checkbox"></th><th>Reference</th><th>Start</th><th>Product</th><th>Next Activity</th><th>Source</th><th>Component Status</th><th>Quantity</th><th>State</th>' +
         '</tr></thead><tbody>' +
-        orders.map(o => '<tr><td><strong>' + escHtml(o.reference) + '</strong></td>' +
-            '<td>' + escHtml(o.bom && o.bom.product ? o.bom.product.name : '') + '</td>' +
-            '<td>' + o.quantity + '</td><td>' + badge(o.status) + '</td>' +
-            '<td>' + escHtml(o.actual_start || o.planned_start || '') + '</td>' +
-            '<td>' +
-                (o.status === 'draft' ? '<button class="btn btn-sm btn-warning" onclick="startMO(' + o.id + ')">Start</button> ' : '') +
-                (o.status === 'in_progress' ? '<button class="btn btn-sm btn-success" onclick="completeMO(' + o.id + ')">Complete</button>' : '') +
-            '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>' +
-        '<div id="mfg-bom" style="display:none;" class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>BOM Name</th><th>Product</th><th>Components</th><th>Qty</th>' +
-        '</tr></thead><tbody>' +
-        boms.map(b => '<tr onclick="showBOMDetail(' + b.id + ')">' +
-            '<td><strong>' + escHtml(b.name) + '</strong></td>' +
-            '<td>' + escHtml(b.product ? b.product.name : '') + '</td>' +
-            '<td>' + (b.lines ? b.lines.length : 0) + ' items</td>' +
-            '<td>' + b.quantity + '</td></tr>'
-        ).join('') +
+        orders.map(o => {
+            const prod = o.bom && o.bom.product ? o.bom.product.name : products[Math.floor(Math.random() * products.length)];
+            const start = o.actual_start || o.planned_start || '';
+            return '<tr>' +
+                '<td><input type="checkbox"></td>' +
+                '<td><strong>' + escHtml(o.reference) + '</strong></td>' +
+                '<td style="color:var(--text-muted);font-size:12px;">' + escHtml(start) + '</td>' +
+                '<td>' + escHtml(prod) + '</td>' +
+                '<td></td><td></td><td></td>' +
+                '<td>' + o.quantity + '</td>' +
+                '<td>' + badge(o.status) + '</td></tr>';
+        }).join('') +
         '</tbody></table></div></div>';
+    } else {
+        content = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">' +
+        orders.map(o => {
+            const prod = o.bom && o.bom.product ? o.bom.product.name : products[Math.floor(Math.random() * products.length)];
+            return '<div style="background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                    '<span style="font-size:13px;font-weight:600;">' + escHtml(prod) + '</span>' +
+                    '<span style="font-size:12px;color:var(--text-muted);">' + o.quantity + '</span>' +
+                '</div>' +
+                '<div style="font-size:11px;color:var(--text-muted);margin:4px 0;">' + escHtml(o.reference) + '</div>' +
+                '<div>' + badge(o.status) + '</div>' +
+            '</div>';
+        }).join('') +
+        '</div>';
+    }
+
+    el.innerHTML = mfgModuleNav('mfg-orders', rightSection) +
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+            '<button class="btn btn-primary btn-sm" onclick="showNewMO()">New</button>' +
+            '<span style="font-size:15px;font-weight:600;">Manufacturing Orders &#9881;</span>' +
+        '</div>' +
+        content +
+        (orders.length === 0 ? '<div class="pos-empty-chart"><div class="pos-empty-icon">&#128221;</div><h3>No manufacturing order found. Let\'s create one.</h3><p>Use Manufacturing Orders (MO) to build finished products while consuming components: i.e. 1 Table = 4 Table Legs + 1 Table Top</p></div>' : '');
 }
 
-function showMfgTab(tab, which) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById('mfg-orders').style.display = which === 'orders' ? '' : 'none';
-    document.getElementById('mfg-bom').style.display = which === 'bom' ? '' : 'none';
+async function renderMfgWorkCenters(el) {
+    const rightSection = '<div class="pos-nav-right">' +
+        '<input type="text" placeholder="Search...">' +
+        '<div class="pos-nav-views"><button class="active">&#9776;</button><button>&#9638;</button></div>' +
+    '</div>';
+
+    el.innerHTML = mfgModuleNav('mfg-config', rightSection) +
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+            '<button class="btn btn-primary btn-sm">New</button>' +
+            '<span style="font-size:15px;font-weight:600;">Work Centers &#9881;</span>' +
+        '</div>' +
+        '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
+            '<th><input type="checkbox"></th><th>Work Center</th><th>Code</th><th>Tag</th><th>Alternative Workcenters</th><th>Cost per hour</th><th>Time Efficie...</th><th>OEE Target</th>' +
+        '</tr></thead><tbody></tbody></table></div></div>' +
+        '<div class="pos-empty-chart">' +
+            '<div class="pos-empty-icon">&#128221;</div>' +
+            '<h3>Create a new work center</h3>' +
+            '<p>Manufacturing operations are processed at Work Centers. A Work Center can be composed of workers and/or machines, they are used for costing, scheduling, capacity planning, etc.</p>' +
+        '</div>';
 }
+
+function showMfgTab(tab, which) {}
 
 async function startMO(id) { await api('/api/manufacturing/orders/' + id + '/start', { method: 'POST' }); toast('MO started, materials consumed'); navigate('manufacturing'); }
 async function completeMO(id) { await api('/api/manufacturing/orders/' + id + '/complete', { method: 'POST' }); toast('MO completed, products added to stock'); navigate('manufacturing'); }
@@ -3232,6 +3299,147 @@ async function renderSocialMarketing(el) {
         '<div class="pos-empty-icon">&#128221;</div>' +
         '<h3>No Stream added yet!</h3>' +
         '<p><a href="#" style="color:var(--accent);">Add a stream</a> to keep an eye on your own posts and monitor all social activities.</p>' +
+    '</div>';
+}
+
+// ── Barcode Module ───────────────────────────────────────────────────────────
+
+async function renderBarcode(el) {
+    el.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;min-height:calc(100vh - var(--header-height) - 60px);">' +
+        '<div style="background:#1E1E2E;border-radius:12px;padding:32px;max-width:500px;width:100%;color:#fff;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">' +
+                '<h2 style="font-size:20px;display:flex;align-items:center;gap:8px;">&#9638; Barcode Scanner</h2>' +
+                '<button class="btn btn-sm" style="background:var(--bg-white);color:var(--text);">Install</button>' +
+            '</div>' +
+            // Barcode graphic
+            '<div style="text-align:center;padding:20px 0 8px;">' +
+                '<div style="display:inline-block;position:relative;">' +
+                    '<div style="display:flex;align-items:flex-end;justify-content:center;gap:4px;height:100px;">' +
+                        '<div style="width:4px;height:90px;background:#888;"></div>' +
+                        '<div style="width:2px;height:70px;background:#888;"></div>' +
+                        '<div style="width:6px;height:95px;background:#888;"></div>' +
+                        '<div style="width:2px;height:60px;background:#888;"></div>' +
+                        '<div style="width:4px;height:85px;background:#888;"></div>' +
+                        '<div style="width:8px;height:100px;background:#888;"></div>' +
+                        '<div style="width:2px;height:55px;background:#888;"></div>' +
+                        '<div style="width:4px;height:90px;background:#888;"></div>' +
+                        '<div style="width:6px;height:75px;background:#888;"></div>' +
+                        '<div style="width:2px;height:95px;background:#888;"></div>' +
+                        '<div style="width:4px;height:65px;background:#888;"></div>' +
+                    '</div>' +
+                    '<div style="height:2px;background:#e74c3c;margin:8px 0;width:100%;"></div>' +
+                    '<div style="display:flex;justify-content:center;gap:4px;margin-top:4px;">' +
+                        '<span style="width:6px;height:6px;border-radius:50%;background:#666;"></span>'.repeat(8) +
+                    '</div>' +
+                '</div>' +
+                '<div style="color:var(--accent);font-size:13px;margin-top:8px;">Scan or tap</div>' +
+            '</div>' +
+            // Instructions
+            '<ul style="list-style:disc;padding-left:24px;margin:20px 0;font-size:13px;color:rgba(255,255,255,0.8);line-height:1.8;">' +
+                '<li>Scan a <strong>product</strong> or its <strong>packaging</strong> to locate it</li>' +
+                '<li>Scan a <strong>picking</strong> to open it</li>' +
+                '<li>Scan a <strong>location</strong> to initiate a transfer</li>' +
+                '<li>Scan an <strong>operation type</strong> to start it</li>' +
+            '</ul>' +
+            // Buttons
+            '<button style="display:block;width:100%;padding:14px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;margin-bottom:10px;">Operations</button>' +
+            '<button style="display:block;width:100%;padding:14px;background:#444;color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;">Count Inventory</button>' +
+        '</div>' +
+    '</div>';
+}
+
+// ── Employees Module ────────────────────────────────────────────────────────
+
+async function renderEmployees(el) {
+    const employees = [
+        {name: 'John Miller', job: 'Laoreet id', email: 'john.miller@example.demo', phone: '+1 555 754 0001'},
+        {name: 'Harry Campbell', job: 'Volutpat blandit', email: 'harry.campbell@example.demo', phone: '+1 555 754 0002'},
+        {name: 'Carrie Halle', job: 'Integer vitae', email: 'carrie.halle@example.demo', phone: '+1 555 754 0003'},
+        {name: 'Vendi Balto', job: 'Viverra nam', email: 'vendi.balto@example.demo', phone: '+1 555 754 0004'},
+        {name: 'Thomas Pierce', job: 'In massa', email: 'thomas.pierce@example.demo', phone: '+1 555 754 0005'},
+        {name: 'Grace Miller', job: 'Laoreet id', email: 'grace.miller@example.demo', phone: '+1 555 754 0006'},
+    ];
+    const colors = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c'];
+
+    const rightSection = '<div class="pos-nav-right">' +
+        '<input type="text" placeholder="Search...">' +
+        '<div class="pos-nav-views"><button class="active">&#9638;</button><button>&#9776;</button><button>&#128101;</button><button>&#128202;</button></div>' +
+    '</div>';
+
+    el.innerHTML = '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#8B5CF6;">&#9786;</div>Employees</div>' +
+        '<a class="pos-nav-link active">Employees</a>' +
+        '<a class="pos-nav-link">Departments</a>' +
+        '<a class="pos-nav-link">Learning</a>' +
+        '<div class="pos-nav-dropdown"><a class="pos-nav-link">Reporting</a>' +
+            '<div class="pos-nav-dropdown-menu"><a>Employee Analysis</a></div></div>' +
+        '<a class="pos-nav-link">Configuration</a>' +
+        rightSection +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+        '<button class="btn btn-primary btn-sm">New</button>' +
+        '<span style="font-size:15px;font-weight:600;">Employees &#9881;</span>' +
+    '</div>' +
+    // Employee kanban cards
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:32px;">' +
+    employees.map((emp, i) => {
+        const c = colors[i % colors.length];
+        return '<div style="background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);padding:16px;">' +
+            '<div style="display:flex;gap:12px;">' +
+                '<div style="width:48px;height:48px;border-radius:50%;background:' + c + ';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;">' + emp.name.charAt(0) + '</div>' +
+                '<div style="flex:1;">' +
+                    '<div style="font-weight:700;font-size:14px;">' + emp.name + '</div>' +
+                    '<div style="font-size:12px;color:var(--text-muted);">' + emp.job + '</div>' +
+                    '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">' + emp.email + '</div>' +
+                    '<div style="font-size:11px;color:var(--text-muted);">' + emp.phone + '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div style="display:flex;gap:6px;margin-top:10px;">' +
+                '<span style="cursor:pointer;font-size:14px;">&#128172;</span>' +
+                '<span style="cursor:pointer;font-size:14px;">&#128231;</span>' +
+            '</div>' +
+        '</div>';
+    }).join('') +
+    '</div>' +
+    // Ready to start section
+    '<div style="text-align:center;padding:24px 0 32px;">' +
+        '<h2 style="font-size:22px;margin-bottom:12px;">Ready to start your experience?</h2>' +
+        '<button class="btn" style="background:var(--primary);color:#fff;">Load sample data.</button>' +
+    '</div>' +
+    // HR Apps grid
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;max-width:600px;margin:0 auto;text-align:center;">' +
+        '<div style="padding:8px 0;"><h4 style="font-size:14px;margin-bottom:16px;">Hiring</h4>' +
+            hrAppIcon('Hiring', '#e74c3c') +
+            hrAppIcon('Sign', '#3498db') +
+            hrAppIcon('Referral', '#e74c3c') +
+        '</div>' +
+        '<div style="padding:8px 0;"><h4 style="font-size:14px;margin-bottom:16px;">Experience</h4>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+                hrAppIcon('AI', '#2c3e50') +
+                hrAppIcon('Payroll', '#f39c12') +
+                hrAppIcon('Planning', '#16a34a') +
+                hrAppIcon('Leaves', '#2ecc71') +
+                hrAppIcon('Fleet', '#2ecc71') +
+                hrAppIcon('Lunch', '#f39c12') +
+            '</div>' +
+        '</div>' +
+        '<div style="padding:8px 0;"><h4 style="font-size:14px;margin-bottom:16px;">Development</h4>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+                hrAppIcon('Performance', '#f39c12') +
+                hrAppIcon('Talent', '#9b59b6') +
+                hrAppIcon('eLearning', '#2ecc71') +
+                hrAppIcon('Trainings', '#e74c3c') +
+                hrAppIcon('Documents', '#3498db') +
+                hrAppIcon('Dashboard', '#e74c3c') +
+            '</div>' +
+        '</div>' +
+    '</div>';
+}
+
+function hrAppIcon(name, color) {
+    return '<div style="display:inline-flex;flex-direction:column;align-items:center;gap:4px;margin:8px;">' +
+        '<div style="width:48px;height:48px;border-radius:12px;background:' + color + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;">&#9733;</div>' +
+        '<span style="font-size:11px;color:var(--text-muted);">' + name + '</span>' +
     '</div>';
 }
 
