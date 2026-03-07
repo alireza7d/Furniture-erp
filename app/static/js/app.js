@@ -390,27 +390,56 @@ async function deleteLead(id) {
 
 // ── Sales Module ────────────────────────────────────────────────────────────
 
+let salesSearch = '';
+
 async function renderSales(el) {
     const [orders, dash] = await Promise.all([api('/api/sales/orders'), api('/api/sales/dashboard')]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Sales Orders</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewSaleOrder()">+ New Order</button></div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value">' + fmtN(dash.total_orders) + '</div></div>' +
-            '<div class="stat-card accent"><div class="stat-label">Total Revenue</div><div class="stat-value">' + fmt(dash.total_revenue) + '</div></div>' +
-            '<div class="stat-card success"><div class="stat-label">Avg Order Value</div><div class="stat-value">' + fmt(dash.avg_order_value) + '</div></div>' +
+    let filtered = orders;
+    if (salesSearch) {
+        const q = salesSearch.toLowerCase();
+        filtered = orders.filter(o => (o.reference||'').toLowerCase().includes(q) || (o.customer?.name||'').toLowerCase().includes(q) || (o.status||'').toLowerCase().includes(q));
+    }
+    const grandTotal = filtered.reduce((sum, o) => sum + (o.total || 0), 0);
+
+    el.innerHTML = '<div class="contacts-toolbar">' +
+        '<div class="contacts-toolbar-left">' +
+            '<button class="btn btn-accent" onclick="showNewSaleOrder()">New</button>' +
+            '<span class="contacts-breadcrumb">Quotations</span>' +
         '</div>' +
-        '<div class="card"><div class="card-header">Orders</div><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Reference</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>Actions</th>' +
+        '<div class="contacts-toolbar-center">' +
+            '<div class="contacts-search-box">' +
+                '<span class="contacts-search-icon">&#128269;</span>' +
+                '<input type="text" class="contacts-search-input" placeholder="Search..." value="' + escHtml(salesSearch) + '" oninput="salesSearch=this.value;renderSales(document.getElementById(\'content\'))">' +
+            '</div>' +
+        '</div>' +
+        '<div class="contacts-toolbar-right">' +
+            '<span class="contacts-paging">1-' + filtered.length + ' / ' + filtered.length + '</span>' +
+        '</div>' +
+    '</div>' +
+    '<div class="card" style="overflow:hidden;border-radius:0;">' +
+        '<table class="contacts-table"><thead><tr>' +
+            '<th style="width:32px;"><input type="checkbox" onchange="document.querySelectorAll(\'.sales-cb\').forEach(c=>c.checked=this.checked)"></th>' +
+            '<th>Number</th><th>Creation Date</th><th>Customer</th><th>Salesperson</th><th>Activities</th><th style="text-align:right;">Total</th><th>Status</th>' +
         '</tr></thead><tbody>' +
-        orders.map(o => '<tr onclick="showSaleOrderDetail(' + o.id + ')">' +
-            '<td><strong>' + escHtml(o.reference) + '</strong></td>' +
-            '<td>' + escHtml(o.customer ? o.customer.name : 'N/A') + '</td>' +
-            '<td>' + escHtml(o.order_date || '') + '</td>' +
-            '<td><strong>' + fmt(o.total) + '</strong></td>' +
-            '<td>' + badge(o.status) + '</td>' +
-            '<td><button class="btn btn-sm btn-outline" onclick="event.stopPropagation();showSaleOrderDetail(' + o.id + ')">View</button></td>' +
-        '</tr>').join('') +
-        '</tbody></table></div></div>';
+        (filtered.length ? filtered.map(o => {
+            const custName = o.customer ? o.customer.name : '';
+            const initials = contactInitials(custName);
+            const color = contactAvatarColor(custName);
+            const created = o.created_at ? new Date(o.created_at).toLocaleString('en-US', {month:'short',day:'numeric',hour:'numeric',minute:'2-digit',hour12:true}) : (o.order_date || '');
+            return '<tr onclick="showSaleOrderDetail(' + o.id + ')">' +
+                '<td style="width:32px;" onclick="event.stopPropagation()"><input type="checkbox" class="sales-cb" value="' + o.id + '"></td>' +
+                '<td>' + escHtml(o.reference) + '</td>' +
+                '<td>' + escHtml(created) + '</td>' +
+                '<td>' + escHtml(custName) + '</td>' +
+                '<td><div class="contact-name-cell"><span class="contact-avatar" style="background:' + color + ';width:22px;height:22px;min-width:22px;font-size:10px;">' + initials + '</span><span>' + escHtml(custName) + '</span></div></td>' +
+                '<td><span class="contact-activity-icon">&#9201;</span></td>' +
+                '<td style="text-align:right;font-weight:600;">' + fmt(o.total) + '</td>' +
+                '<td>' + badge(o.status) + '</td>' +
+            '</tr>';
+        }).join('') : '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">No quotations found</td></tr>') +
+        (filtered.length ? '<tr style="background:#F9FAFB;font-weight:700;cursor:default;"><td colspan="6"></td><td style="text-align:right;padding:10px 14px;">' + fmt(grandTotal) + '</td><td></td></tr>' : '') +
+        '</tbody></table>' +
+    '</div>';
 }
 
 async function showNewSaleOrder() {
