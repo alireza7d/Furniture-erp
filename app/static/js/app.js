@@ -787,29 +787,272 @@ async function completePOSOrder(method) {
 
 // ── Accounting Module ───────────────────────────────────────────────────────
 
+let acctSubPage = 'acct-dashboard';
+
+function acctModuleNav(activePage, extra) {
+    extra = extra || '';
+    return '<div class="pos-module-nav">' +
+        '<div class="pos-nav-brand"><div class="pos-brand-icon" style="background:#714B67;">&#9646;</div>Accounting</div>' +
+        '<a class="pos-nav-link' + (activePage === 'acct-dashboard' ? ' active' : '') + '" onclick="renderAcctSubPage(\'acct-dashboard\')">Dashboard</a>' +
+        '<a class="pos-nav-link' + (activePage === 'acct-customers' ? ' active' : '') + '" onclick="renderAcctSubPage(\'acct-customers\')">Customers</a>' +
+        '<a class="pos-nav-link' + (activePage === 'acct-vendors' ? ' active' : '') + '" onclick="renderAcctSubPage(\'acct-vendors\')">Vendors</a>' +
+        '<a class="pos-nav-link' + (activePage === 'acct-accounting' ? ' active' : '') + '" onclick="renderAcctSubPage(\'acct-accounting\')">Accounting</a>' +
+        '<a class="pos-nav-link' + (activePage === 'acct-review' ? ' active' : '') + '" onclick="renderAcctSubPage(\'acct-review\')">Review</a>' +
+        '<div class="pos-nav-dropdown">' +
+            '<a class="pos-nav-link' + (activePage.startsWith('acct-report') ? ' active' : '') + '">Reporting</a>' +
+            '<div class="pos-nav-dropdown-menu">' +
+                '<a onclick="renderAcctSubPage(\'acct-report-journal\')">Journal Items</a>' +
+                '<a onclick="renderAcctSubPage(\'acct-report-gl\')">General Ledger</a>' +
+                '<a onclick="renderAcctSubPage(\'acct-report-pl\')">Profit &amp; Loss</a>' +
+                '<a onclick="renderAcctSubPage(\'acct-report-bs\')">Balance Sheet</a>' +
+            '</div>' +
+        '</div>' +
+        '<a class="pos-nav-link' + (activePage === 'acct-config' ? ' active' : '') + '" onclick="renderAcctSubPage(\'acct-config\')">Configuration</a>' +
+        extra +
+    '</div>';
+}
+
+async function renderAcctSubPage(sub) {
+    acctSubPage = sub;
+    const el = document.getElementById('page-content');
+    switch (sub) {
+        case 'acct-dashboard': await renderAccounting(el); break;
+        case 'acct-customers': await renderAcctCustomers(el); break;
+        case 'acct-vendors': await renderAcctVendors(el); break;
+        case 'acct-accounting': await renderAcctJournal(el); break;
+        case 'acct-review': await renderAcctReview(el); break;
+        case 'acct-report-journal': await renderAcctReportJournal(el); break;
+        case 'acct-report-gl': await renderAcctReportGL(el); break;
+        case 'acct-report-pl': await renderAcctReportPL(el); break;
+        case 'acct-report-bs': await renderAcctReportBS(el); break;
+        case 'acct-config': await renderAcctConfig(el); break;
+        default: await renderAccounting(el);
+    }
+}
+
 async function renderAccounting(el) {
     const [dash, invoices] = await Promise.all([api('/api/accounting/dashboard'), api('/api/accounting/invoices')]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Accounting</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewInvoice()">+ New Invoice</button></div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card success"><div class="stat-label">Total Income</div><div class="stat-value">' + fmt(dash.total_income) + '</div></div>' +
-            '<div class="stat-card danger"><div class="stat-label">Total Expenses</div><div class="stat-value">' + fmt(dash.total_expenses) + '</div></div>' +
-            '<div class="stat-card accent"><div class="stat-label">Net Profit</div><div class="stat-value">' + fmt(dash.net_profit) + '</div></div>' +
-            '<div class="stat-card warning"><div class="stat-label">Receivable</div><div class="stat-value">' + fmt(dash.accounts_receivable) + '</div></div>' +
-            '<div class="stat-card info"><div class="stat-label">Payable</div><div class="stat-value">' + fmt(dash.accounts_payable) + '</div></div>' +
-            '<div class="stat-card danger"><div class="stat-label">Overdue</div><div class="stat-value">' + fmtN(dash.overdue_invoices) + '</div></div>' +
+    const custInv = invoices.filter(i => i.type === 'customer');
+    const vendInv = invoices.filter(i => i.type === 'vendor');
+
+    // Group customer invoices by due date period
+    const now = new Date();
+    const periods = { 'Due': 0, 'This Week': 0, 'Not Due': 0 };
+    const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekAhead = new Date(now); weekAhead.setDate(weekAhead.getDate() + 7);
+    const twoWeeks = new Date(now); twoWeeks.setDate(twoWeeks.getDate() + 14);
+
+    custInv.forEach(i => {
+        if (i.status === 'paid') return;
+        const d = new Date(i.invoice_date || i.created_at);
+        if (d < now) periods['Due'] += (i.total || 0);
+        else if (d < weekAhead) periods['This Week'] += (i.total || 0);
+        else periods['Not Due'] += (i.total || 0);
+    });
+
+    const maxBar = Math.max(...Object.values(periods), 1);
+    const barsHtml = Object.entries(periods).map(([label, val]) => {
+        const h = Math.max(Math.round((val / maxBar) * 120), 4);
+        return '<div style="text-align:center;flex:1;">' +
+            '<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:130px;">' +
+                '<div style="width:80%;height:' + h + 'px;background:#3a3a4a;border-radius:3px 3px 0 0;"></div>' +
+            '</div>' +
+            '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">' + label + '</div>' +
+        '</div>';
+    }).join('');
+
+    const rightSection = '<div class="pos-nav-right">' +
+        '<span class="pos-filter-tag">&#9660; Favorites <span class="close">&times;</span></span>' +
+        '<input type="text" placeholder="Search...">' +
+        '<span class="pos-nav-pagination">1-5 / 5</span>' +
+        '<span style="color:rgba(255,255,255,0.4);font-size:13px;">&#9664; &#9654;</span>' +
+    '</div>';
+
+    el.innerHTML = acctModuleNav('acct-dashboard', rightSection) +
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">' +
+            '<button class="btn btn-primary btn-sm" onclick="showNewInvoice()">New</button>' +
+            '<h2 style="font-size:18px;font-weight:600;">Dashboard &#9881;</h2>' +
         '</div>' +
-        '<div class="tabs">' +
-            '<div class="tab active" onclick="filterInvoices(this,&apos;all&apos;)">All</div>' +
-            '<div class="tab" onclick="filterInvoices(this,&apos;customer&apos;)">Customer Invoices</div>' +
-            '<div class="tab" onclick="filterInvoices(this,&apos;vendor&apos;)">Vendor Bills</div>' +
+        '<div style="display:grid;grid-template-columns:1.8fr 1fr;gap:20px;">' +
+            // Left column
+            '<div>' +
+                // Sales card
+                '<div class="acct-dash-card">' +
+                    '<h3 class="acct-dash-card-title">Sales</h3>' +
+                    '<p class="acct-dash-card-desc">Get Paid online. Send electronic invoices.</p>' +
+                    '<button class="btn btn-primary btn-sm" onclick="showNewInvoice()" style="margin-bottom:16px;">New</button>' +
+                    '<div style="display:flex;align-items:flex-end;gap:4px;">' + barsHtml + '</div>' +
+                '</div>' +
+                // Bank card
+                '<div class="acct-dash-card" style="margin-top:16px;">' +
+                    '<h3 class="acct-dash-card-title">Bank</h3>' +
+                    '<p class="acct-dash-card-desc">Connect your bank. Match invoices automatically.</p>' +
+                    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;">' +
+                        acctBankLogo('Search over<br>26 000 banks', '#3a3a4a') +
+                        acctBankLogo('CHASE', '#004B87') +
+                        acctBankLogo('AMEX', '#006FCF') +
+                        acctBankLogo('WELLS<br>FARGO', '#D71E28') +
+                        acctBankLogo('Capital One', '#004977') +
+                        acctBankLogo('MERCURY', '#404040') +
+                        acctBankLogo('PayPal', '#003087') +
+                    '</div>' +
+                    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:8px;">' +
+                        acctBankLogo('US bank', '#D52B1E') +
+                        acctBankLogo('TRUIST', '#522E91') +
+                        acctBankLogo('relay', '#404040') +
+                        acctBankLogo('Airwallex', '#404040') +
+                        acctBankLogo('PNC', '#F58025') +
+                        acctBankLogo('citibank', '#003DA5') +
+                        acctBankLogo('bluevine', '#00A650') +
+                    '</div>' +
+                '</div>' +
+                // Tax Returns card
+                '<div class="acct-dash-card" style="margin-top:16px;">' +
+                    '<h3 class="acct-dash-card-title">Tax Returns</h3>' +
+                    '<button class="btn btn-sm" style="background:#5B3A52;color:#fff;margin-bottom:12px;">Tax Returns</button>' +
+                    '<div class="acct-dash-step">&#9675; <a href="#" style="color:var(--accent);">Set Company Data</a></div>' +
+                    '<div class="acct-dash-step">&#9675; <a href="#" style="color:var(--accent);">Set Periods</a></div>' +
+                    '<div class="acct-dash-step">&#9675; <a href="#" style="color:var(--accent);">Review Chart of Accounts</a></div>' +
+                '</div>' +
+            '</div>' +
+            // Right column
+            '<div>' +
+                // Purchases card
+                '<div class="acct-dash-card">' +
+                    '<h3 class="acct-dash-card-title">Purchases</h3>' +
+                    '<p class="acct-dash-card-desc">Let artificial intelligence scan your bill. Pay easily.</p>' +
+                    '<button class="btn btn-sm" style="background:#5B3A52;color:#fff;margin-bottom:16px;">Upload</button>' +
+                    '<div style="display:flex;align-items:center;gap:24px;justify-content:center;padding:20px 0;">' +
+                        '<div style="text-align:center;">' +
+                            '<div style="font-size:40px;color:var(--accent);margin-bottom:4px;">&#128196;</div>' +
+                            '<div style="font-size:12px;color:var(--text-muted);background:var(--bg);padding:4px 12px;border-radius:4px;border:1px dashed var(--border);">Drag &amp; drop</div>' +
+                        '</div>' +
+                        '<span style="color:var(--text-muted);">or</span>' +
+                        '<div style="text-align:center;">' +
+                            '<div style="font-size:40px;color:var(--accent);margin-bottom:4px;">&#128196;</div>' +
+                            '<a href="#" style="color:var(--accent);font-size:12px;" onclick="showNewInvoice();return false;">Create a bill manually</a>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+                // Point of Sale card
+                '<div class="acct-dash-card" style="margin-top:16px;">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                        '<h3 class="acct-dash-card-title" style="margin-bottom:0;">Point of Sale</h3>' +
+                        '<span style="cursor:pointer;color:var(--text-muted);">&#8942;</span>' +
+                    '</div>' +
+                    '<button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="navigate(\'pos\')">New</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    window._allInvoices = invoices;
+}
+
+function acctBankLogo(name, bg) {
+    return '<div style="background:' + bg + ';color:#fff;border-radius:6px;padding:10px 4px;text-align:center;font-size:9px;font-weight:700;line-height:1.3;min-height:52px;display:flex;align-items:center;justify-content:center;">' + name + '</div>';
+}
+
+async function renderAcctCustomers(el) {
+    const invoices = await api('/api/accounting/invoices');
+    const custInv = invoices.filter(i => i.type === 'customer');
+    el.innerHTML = acctModuleNav('acct-customers') +
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+            '<button class="btn btn-primary btn-sm" onclick="showNewInvoice()">New</button>' +
+            '<h2 style="font-size:18px;">Customer Invoices</h2>' +
         '</div>' +
         '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
+            '<th>Reference</th><th>Contact</th><th>Date</th><th>Total</th><th>Paid</th><th>Status</th>' +
+        '</tr></thead><tbody>' +
+        custInv.map(i => invoiceRow(i)).join('') +
+        '</tbody></table></div></div>';
+}
+
+async function renderAcctVendors(el) {
+    const invoices = await api('/api/accounting/invoices');
+    const vendInv = invoices.filter(i => i.type === 'vendor');
+    el.innerHTML = acctModuleNav('acct-vendors') +
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+            '<button class="btn btn-primary btn-sm" onclick="showNewInvoice()">New</button>' +
+            '<h2 style="font-size:18px;">Vendor Bills</h2>' +
+        '</div>' +
+        '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
+            '<th>Reference</th><th>Contact</th><th>Date</th><th>Total</th><th>Paid</th><th>Status</th>' +
+        '</tr></thead><tbody>' +
+        vendInv.map(i => invoiceRow(i)).join('') +
+        '</tbody></table></div></div>';
+}
+
+async function renderAcctJournal(el) {
+    const invoices = await api('/api/accounting/invoices');
+    el.innerHTML = acctModuleNav('acct-accounting') +
+        '<h2 style="font-size:18px;margin-bottom:16px;">Journal Entries</h2>' +
+        '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
             '<th>Reference</th><th>Contact</th><th>Type</th><th>Date</th><th>Total</th><th>Paid</th><th>Status</th>' +
-        '</tr></thead><tbody id="invoices-tbody">' +
+        '</tr></thead><tbody>' +
         invoices.map(i => invoiceRow(i)).join('') +
         '</tbody></table></div></div>';
-    window._allInvoices = invoices;
+}
+
+async function renderAcctReview(el) {
+    el.innerHTML = acctModuleNav('acct-review') +
+        '<h2 style="font-size:18px;margin-bottom:16px;">Review</h2>' +
+        '<div class="empty-state"><p>No items to review</p></div>';
+}
+
+async function renderAcctReportJournal(el) {
+    const invoices = await api('/api/accounting/invoices');
+    el.innerHTML = acctModuleNav('acct-report-journal') +
+        '<h2 style="font-size:18px;margin-bottom:16px;">Journal Items</h2>' +
+        '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
+            '<th>Reference</th><th>Type</th><th>Date</th><th>Debit</th><th>Credit</th></tr></thead><tbody>' +
+        invoices.map(i => '<tr><td>' + escHtml(i.reference) + '</td><td>' + escHtml(i.type) + '</td><td>' +
+            escHtml(i.invoice_date || '') + '</td><td>' + (i.type === 'customer' ? fmt(i.total) : fmt(0)) +
+            '</td><td>' + (i.type === 'vendor' ? fmt(i.total) : fmt(0)) + '</td></tr>').join('') +
+        '</tbody></table></div></div>';
+}
+
+async function renderAcctReportGL(el) {
+    const dash = await api('/api/accounting/dashboard');
+    el.innerHTML = acctModuleNav('acct-report-gl') +
+        '<h2 style="font-size:18px;margin-bottom:16px;">General Ledger</h2>' +
+        '<div class="stats-grid">' +
+            '<div class="stat-card accent"><div class="stat-label">Total Income</div><div class="stat-value">' + fmt(dash.total_income) + '</div></div>' +
+            '<div class="stat-card danger"><div class="stat-label">Total Expenses</div><div class="stat-value">' + fmt(dash.total_expenses) + '</div></div>' +
+            '<div class="stat-card success"><div class="stat-label">Net Profit</div><div class="stat-value">' + fmt(dash.net_profit) + '</div></div>' +
+        '</div>';
+}
+
+async function renderAcctReportPL(el) {
+    const dash = await api('/api/accounting/dashboard');
+    el.innerHTML = acctModuleNav('acct-report-pl') +
+        '<h2 style="font-size:18px;margin-bottom:16px;">Profit &amp; Loss</h2>' +
+        '<div class="card" style="padding:20px;max-width:500px;">' +
+            '<div class="detail-field"><div class="detail-label">Income</div><div class="detail-value" style="color:var(--success);">' + fmt(dash.total_income) + '</div></div>' +
+            '<div class="detail-field"><div class="detail-label">Expenses</div><div class="detail-value" style="color:var(--danger);">' + fmt(dash.total_expenses) + '</div></div>' +
+            '<hr class="divider">' +
+            '<div class="detail-field"><div class="detail-label">Net Profit</div><div class="detail-value" style="font-size:22px;font-weight:700;">' + fmt(dash.net_profit) + '</div></div>' +
+        '</div>';
+}
+
+async function renderAcctReportBS(el) {
+    const dash = await api('/api/accounting/dashboard');
+    el.innerHTML = acctModuleNav('acct-report-bs') +
+        '<h2 style="font-size:18px;margin-bottom:16px;">Balance Sheet</h2>' +
+        '<div class="card" style="padding:20px;max-width:500px;">' +
+            '<div class="detail-field"><div class="detail-label">Accounts Receivable</div><div class="detail-value">' + fmt(dash.accounts_receivable) + '</div></div>' +
+            '<div class="detail-field"><div class="detail-label">Accounts Payable</div><div class="detail-value">' + fmt(dash.accounts_payable) + '</div></div>' +
+            '<div class="detail-field"><div class="detail-label">Overdue Invoices</div><div class="detail-value">' + fmtN(dash.overdue_invoices) + '</div></div>' +
+        '</div>';
+}
+
+async function renderAcctConfig(el) {
+    el.innerHTML = acctModuleNav('acct-config') +
+        '<h2 style="font-size:18px;margin-bottom:16px;">Configuration</h2>' +
+        '<div class="card" style="padding:20px;max-width:600px;">' +
+            '<div class="detail-field"><div class="detail-label">Currency</div><div class="detail-value">OMR (Omani Rial)</div></div>' +
+            '<div class="detail-field"><div class="detail-label">Fiscal Year</div><div class="detail-value">January - December</div></div>' +
+            '<div class="detail-field"><div class="detail-label">Tax Rate</div><div class="detail-value">10%</div></div>' +
+            '<div class="detail-field"><div class="detail-label">Chart of Accounts</div><div class="detail-value">Standard</div></div>' +
+        '</div>';
 }
 
 function invoiceRow(i) {

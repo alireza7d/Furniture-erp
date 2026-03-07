@@ -1130,6 +1130,42 @@ select.form-control {
     font-size: 14px;
 }
 
+/* ── Accounting Dashboard Cards ──────────────────────────────────────────── */
+
+.acct-dash-card {
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+}
+
+.acct-dash-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+}
+
+.acct-dash-card-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.acct-dash-step {
+    padding: 4px 0;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.acct-dash-step a {
+    text-decoration: none;
+}
+
+.acct-dash-step a:hover {
+    text-decoration: underline;
+}
+
 /* ── Print ───────────────────────────────────────────────────────────────────── */
 
 @media print {
