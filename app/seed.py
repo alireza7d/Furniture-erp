@@ -24,7 +24,7 @@ def seed():
         reza = User(
             username="reza",
             full_name="Reza",
-            role="employee",
+            role="owner",
         )
         reza.set_password("reza123")
         db.add(reza)
@@ -32,7 +32,7 @@ def seed():
         mohammad = User(
             username="mohammad",
             full_name="Mohammad",
-            role="employee",
+            role="owner",
         )
         mohammad.set_password("mohammad123")
         db.add(mohammad)
@@ -258,21 +258,31 @@ def seed():
                 changed = True
                 print(f"  Deactivated {old_user.full_name}")
 
-        # Create Reza if not exists
-        if not db2.query(User).filter(User.username == "reza").first():
-            reza = User(username="reza", full_name="Reza", role="employee")
+        # Create or upgrade Reza
+        reza_user = db2.query(User).filter(User.username == "reza").first()
+        if not reza_user:
+            reza = User(username="reza", full_name="Reza", role="owner")
             reza.set_password("reza123")
             db2.add(reza)
             changed = True
-            print("  Created employee: Reza")
+            print("  Created owner: Reza")
+        elif reza_user.role != "owner":
+            reza_user.role = "owner"
+            changed = True
+            print("  Updated Reza to owner role")
 
-        # Create Mohammad if not exists
-        if not db2.query(User).filter(User.username == "mohammad").first():
-            mohammad = User(username="mohammad", full_name="Mohammad", role="employee")
+        # Create or upgrade Mohammad
+        mohammad_user = db2.query(User).filter(User.username == "mohammad").first()
+        if not mohammad_user:
+            mohammad = User(username="mohammad", full_name="Mohammad", role="owner")
             mohammad.set_password("mohammad123")
             db2.add(mohammad)
             changed = True
-            print("  Created employee: Mohammad")
+            print("  Created owner: Mohammad")
+        elif mohammad_user.role != "owner":
+            mohammad_user.role = "owner"
+            changed = True
+            print("  Updated Mohammad to owner role")
 
         if changed:
             db2.commit()
