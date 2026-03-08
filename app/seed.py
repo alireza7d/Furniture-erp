@@ -45,6 +45,14 @@ def seed():
         emp3.set_password("said123")
         db.add(emp3)
 
+        bakhtar = User(
+            username="bakhtar",
+            full_name="Bakhtar",
+            role="employee",
+        )
+        bakhtar.set_password("bakhtar123")
+        db.add(bakhtar)
+
         db.flush()
 
         # ── Real Sales Data (Jan-Feb 2026) ────────────────────────────────────
