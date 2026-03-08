@@ -7,11 +7,15 @@ echo "========================================="
 echo ""
 
 # Install dependencies if needed
-pip install -q fastapi uvicorn sqlalchemy jinja2 aiofiles python-multipart 2>/dev/null
+pip install -q fastapi uvicorn sqlalchemy jinja2 aiofiles python-multipart openpyxl 2>/dev/null
 
 echo "Starting server on http://localhost:8000"
 echo ""
 echo "  Open in your browser:  http://localhost:8000"
+echo ""
+echo "  Login credentials:"
+echo "    Owner:    admin / admin123"
+echo "    Employee: ahmed / ahmed123"
 echo ""
 echo "  Press Ctrl+C to stop the server"
 echo "========================================="

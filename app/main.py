@@ -2,31 +2,32 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
+import os
 
 from app.database import engine, Base
-from app.routers import contacts, products, crm, sales, pos, accounting, inventory, purchase, manufacturing, marketing
+from app.routers import auth, daily_sales, daily_expenses, dashboard, reports, users, audit
 from app.seed import seed
 
 # Create tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="FurnitureERP", version="1.0.0")
+app = FastAPI(title="FurnitureERP - Sales Tracker", version="2.0.0")
+
+# Ensure upload directories exist
+os.makedirs("app/static/uploads/receipts", exist_ok=True)
 
 # Static files & templates
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
 # Register routers
-app.include_router(contacts.router)
-app.include_router(products.router)
-app.include_router(crm.router)
-app.include_router(sales.router)
-app.include_router(pos.router)
-app.include_router(accounting.router)
-app.include_router(inventory.router)
-app.include_router(purchase.router)
-app.include_router(manufacturing.router)
-app.include_router(marketing.router)
+app.include_router(auth.router)
+app.include_router(dashboard.router)
+app.include_router(daily_sales.router)
+app.include_router(daily_expenses.router)
+app.include_router(reports.router)
+app.include_router(users.router)
+app.include_router(audit.router)
 
 
 @app.get("/", response_class=HTMLResponse)

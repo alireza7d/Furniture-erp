@@ -1,1217 +1,1264 @@
 // ============================================================================
-// FurnitureERP — Single Page Application
+// FurnitureERP — Sales & Expense Tracker SPA
 // ============================================================================
 
-const API = '';
+let currentUser = null;
 let currentPage = 'dashboard';
-let posCart = [];
+let chartInstances = {};
 
-// ── Utility Functions ───────────────────────────────────────────────────────
+// ── API Helper ──────────────────────────────────────────────────────────────
 
 async function api(url, options = {}) {
-    const opts = { headers: { 'Content-Type': 'application/json' }, ...options };
-    if (opts.body && typeof opts.body === 'object') opts.body = JSON.stringify(opts.body);
-    const res = await fetch(API + url, opts);
-    if (\!res.ok) {
+    const defaults = {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+    };
+    const opts = { ...defaults, ...options };
+    if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
+        opts.body = JSON.stringify(opts.body);
+    }
+    if (opts.body instanceof FormData) {
+        delete opts.headers['Content-Type'];
+    }
+    const res = await fetch(url, opts);
+    if (res.status === 401) {
+        currentUser = null;
+        showLogin();
+        throw new Error('Not authenticated');
+    }
+    if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: 'Request failed' }));
         throw new Error(err.detail || 'Request failed');
     }
-    return res.json();
+    if (res.headers.get('content-type')?.includes('application/json')) {
+        return res.json();
+    }
+    return res;
 }
 
-function fmt(n) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0); }
-function fmtN(n) { return new Intl.NumberFormat('en-US').format(n || 0); }
-function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+// ── Utility Functions ───────────────────────────────────────────────────────
+
+function esc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+function formatOMR(amount) {
+    const num = parseFloat(amount) || 0;
+    return num.toFixed(3) + ' OMR';
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatDateTime(dtStr) {
+    if (!dtStr) return '';
+    const d = new Date(dtStr);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function todayStr() {
+    return new Date().toISOString().split('T')[0];
+}
+
+function monthStartStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
 
 function toast(msg, type = 'success') {
     const c = document.getElementById('toast-container');
     const t = document.createElement('div');
-    t.className = 'toast ' + type;
+    t.className = `toast ${type}`;
     t.textContent = msg;
     c.appendChild(t);
-    setTimeout(() => t.remove(), 3500);
+    setTimeout(() => t.remove(), 4000);
 }
 
-function badge(status) { return '<span class="badge badge-' + (status || 'draft') + '">' + escHtml(status) + '</span>'; }
+function saleTypeBadge(type) {
+    const labels = { sofa_sale: 'Sofa Sale', repair: 'Repair', service: 'Service', other: 'Other' };
+    return `<span class="badge badge-${type}">${labels[type] || type}</span>`;
+}
+
+function paymentBadge(method) {
+    return `<span class="badge badge-${method}">${method}</span>`;
+}
+
+function isOwner() {
+    return currentUser && currentUser.role === 'owner';
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    const btn = document.getElementById('login-btn');
+
+    errEl.style.display = 'none';
+    btn.textContent = 'Signing in...';
+    btn.disabled = true;
+
+    try {
+        const data = await api('/api/auth/login', {
+            method: 'POST',
+            body: { username, password },
+        });
+        currentUser = data.user;
+        showApp();
+    } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+    } finally {
+        btn.textContent = 'Sign In';
+        btn.disabled = false;
+    }
+    return false;
+}
+
+async function handleLogout() {
+    try { await api('/api/auth/logout', { method: 'POST' }); } catch (e) {}
+    currentUser = null;
+    showLogin();
+}
+
+function showLogin() {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+}
+
+function showApp() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+
+    // Update user info
+    document.getElementById('user-fullname').textContent = currentUser.full_name;
+    document.getElementById('user-role').textContent = currentUser.role;
+    document.getElementById('user-avatar').textContent = currentUser.full_name.charAt(0).toUpperCase();
+    document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-GB', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
+
+    // Show/hide owner-only nav items
+    document.querySelectorAll('.owner-only').forEach(el => {
+        el.style.display = isOwner() ? 'flex' : 'none';
+    });
+
+    navigate('dashboard');
+}
+
+// ── Navigation ──────────────────────────────────────────────────────────────
 
 function navigate(page) {
     currentPage = page;
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
-    document.getElementById('breadcrumb-page').textContent = pageTitle(page);
-    loadPage(page);
+
+    // Update nav
+    document.querySelectorAll('.nav-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.page === page);
+    });
+
+    const titles = {
+        dashboard: 'Dashboard',
+        sales: 'Sales',
+        expenses: 'Expenses',
+        reports: 'Reports',
+        audit: 'Audit Log',
+        users: 'User Management',
+    };
+    document.getElementById('page-title').textContent = titles[page] || page;
+
+    // Close sidebar on mobile
+    document.getElementById('sidebar').classList.remove('open');
+
+    // Destroy old charts
+    Object.values(chartInstances).forEach(c => c.destroy());
+    chartInstances = {};
+
+    // Load page
+    const loaders = {
+        dashboard: loadDashboard,
+        sales: loadSales,
+        expenses: loadExpenses,
+        reports: loadReports,
+        audit: loadAudit,
+        users: loadUsers,
+    };
+    const content = document.getElementById('page-content');
+    content.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
+    if (loaders[page]) loaders[page]();
+
+    return false;
 }
 
-function pageTitle(p) {
-    const map = { dashboard: 'Dashboard', crm: 'CRM', sales: 'Sales', pos: 'Point of Sale',
-        accounting: 'Accounting', inventory: 'Inventory', purchase: 'Purchase',
-        manufacturing: 'Manufacturing', 'email-marketing': 'Email Marketing',
-        'sms-marketing': 'SMS Marketing', contacts: 'Contacts', products: 'Products' };
-    return map[p] || p;
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
 }
 
-function openModal(title, bodyHtml, footerHtml) {
+// ── Modal ────────────────────────────────────────────────────────────────────
+
+function openModal(title, bodyHtml) {
     document.getElementById('modal-title').textContent = title;
     document.getElementById('modal-body').innerHTML = bodyHtml;
-    document.getElementById('modal-footer').innerHTML = footerHtml || '';
-    document.getElementById('modal-overlay').classList.add('show');
+    document.getElementById('modal-overlay').style.display = 'flex';
 }
 
-function closeModal() { document.getElementById('modal-overlay').classList.remove('show'); }
-
-function getFormData(formId) {
-    const form = document.getElementById(formId);
-    const data = {};
-    form.querySelectorAll('[name]').forEach(el => {
-        let val = el.value;
-        if (el.type === 'number') val = parseFloat(val) || 0;
-        if (el.type === 'checkbox') val = el.checked;
-        data[el.name] = val;
-    });
-    return data;
-}
-
-// ── Page Router ─────────────────────────────────────────────────────────────
-
-async function loadPage(page) {
-    const el = document.getElementById('content');
-    el.innerHTML = '<div style="text-align:center;padding:60px;">Loading...</div>';
-    try {
-        switch (page) {
-            case 'dashboard': await renderDashboard(el); break;
-            case 'crm': await renderCRM(el); break;
-            case 'sales': await renderSales(el); break;
-            case 'pos': await renderPOS(el); break;
-            case 'accounting': await renderAccounting(el); break;
-            case 'inventory': await renderInventory(el); break;
-            case 'purchase': await renderPurchase(el); break;
-            case 'manufacturing': await renderManufacturing(el); break;
-            case 'email-marketing': await renderEmailMarketing(el); break;
-            case 'sms-marketing': await renderSMSMarketing(el); break;
-            case 'contacts': await renderContacts(el); break;
-            case 'products': await renderProducts(el); break;
-            default: el.innerHTML = '<div class="empty-state"><p>Page not found</p></div>';
-        }
-    } catch (e) {
-        el.innerHTML = '<div class="empty-state"><p>Error loading page: ' + escHtml(e.message) + '</p></div>';
-    }
+function closeModal(e) {
+    if (e && e.target !== document.getElementById('modal-overlay')) return;
+    document.getElementById('modal-overlay').style.display = 'none';
 }
 
 // ── Dashboard ───────────────────────────────────────────────────────────────
 
-async function renderDashboard(el) {
-    const [crm, sales, inv, pur, mfg, mkt] = await Promise.all([
-        api('/api/crm/dashboard'), api('/api/sales/dashboard'), api('/api/inventory/dashboard'),
-        api('/api/purchase/dashboard'), api('/api/manufacturing/dashboard'), api('/api/marketing/dashboard'),
-    ]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Dashboard</h1></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card accent"><div class="stat-label">CRM Pipeline</div><div class="stat-value">' + fmtN(crm.total_leads) + '</div><div class="stat-sub">' + crm.conversion_rate + '% conversion</div></div>' +
-            '<div class="stat-card"><div class="stat-label">Sales Revenue</div><div class="stat-value">' + fmt(sales.total_revenue) + '</div><div class="stat-sub">' + fmtN(sales.total_orders) + ' orders</div></div>' +
-            '<div class="stat-card success"><div class="stat-label">Inventory Value</div><div class="stat-value">' + fmt(inv.total_stock_value) + '</div><div class="stat-sub">' + fmtN(inv.total_products) + ' products</div></div>' +
-            '<div class="stat-card warning"><div class="stat-label">Purchase Spent</div><div class="stat-value">' + fmt(pur.total_spent) + '</div><div class="stat-sub">' + fmtN(pur.pending_orders) + ' pending</div></div>' +
-            '<div class="stat-card info"><div class="stat-label">Manufacturing</div><div class="stat-value">' + fmtN(mfg.in_progress) + ' Active</div><div class="stat-sub">' + fmtN(mfg.completed) + ' completed</div></div>' +
-            '<div class="stat-card danger"><div class="stat-label">Campaigns Sent</div><div class="stat-value">' + fmtN(mkt.total_emails_sent + mkt.total_sms_sent) + '</div><div class="stat-sub">' + mkt.email_open_rate + '% open rate</div></div>' +
-        '</div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' +
-            '<div class="card"><div class="card-header">CRM Pipeline</div><div class="card-body">' +
-                Object.entries(crm.by_status).map(([k, v]) => '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>' + escHtml(k) + '</span><strong>' + v + '</strong></div>').join('') +
-            '</div></div>' +
-            '<div class="card"><div class="card-header">Sales by Status</div><div class="card-body">' +
-                Object.entries(sales.by_status).map(([k, v]) => '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>' + escHtml(k) + '</span><strong>' + v + '</strong></div>').join('') +
-            '</div></div>' +
-            '<div class="card"><div class="card-header">Low Stock Items</div><div class="card-body">' +
-                (inv.low_stock_items.length ? inv.low_stock_items.map(i => '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>' + escHtml(i.product) + '</span><span class="text-danger fw-bold">' + i.on_hand + ' units</span></div>').join('') : '<p class="text-muted">All stock levels OK</p>') +
-            '</div></div>' +
-            '<div class="card"><div class="card-header">Marketing Overview</div><div class="card-body">' +
-                '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Email Campaigns</span><strong>' + mkt.email_campaigns + '</strong></div>' +
-                '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>SMS Campaigns</span><strong>' + mkt.sms_campaigns + '</strong></div>' +
-                '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Subscribers</span><strong>' + fmtN(mkt.total_subscribers) + '</strong></div>' +
-                '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Email Click Rate</span><strong>' + mkt.email_click_rate + '%</strong></div>' +
-            '</div></div>' +
-        '</div>';
-}
-
-
-// ── CRM Module ──────────────────────────────────────────────────────────────
-
-async function renderCRM(el) {
-    const pipeline = await api('/api/crm/pipeline');
-    const stages = ['new', 'qualified', 'proposition', 'won', 'lost'];
-    const stageLabels = { new: 'New', qualified: 'Qualified', proposition: 'Proposition', won: 'Won', lost: 'Lost' };
-
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">CRM Pipeline</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewLeadForm()">+ New Lead</button></div></div>' +
-        '<div class="kanban-board">' +
-        stages.map(s => {
-            const d = pipeline[s] || { leads: [], count: 0, revenue: 0 };
-            return '<div class="kanban-column"><div class="kanban-column-header">' + stageLabels[s] +
-                '<span class="count">' + d.count + '</span></div><div class="kanban-cards">' +
-                d.leads.map(l => '<div class="kanban-card" onclick="showLeadDetail(' + l.id + ')">' +
-                    '<div class="kanban-card-title">' + escHtml(l.title) + '</div>' +
-                    '<div class="kanban-card-sub">' + escHtml(l.contact ? l.contact.name : 'No contact') + '</div>' +
-                    '<div class="kanban-card-amount">' + fmt(l.expected_revenue) + '</div></div>'
-                ).join('') +
-                '</div></div>';
-        }).join('') + '</div>';
-}
-
-async function showNewLeadForm() {
-    const contacts = await api('/api/contacts?type=customer');
-    const opts = contacts.map(c => '<option value="' + c.id + '">' + escHtml(c.name) + '</option>').join('');
-    openModal('New Lead',
-        '<form id="lead-form">' +
-        '<div class="form-group"><label>Title</label><input name="title" class="form-control" required></div>' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>Contact</label><select name="contact_id" class="form-control"><option value="">Select...</option>' + opts + '</select></div>' +
-            '<div class="form-group"><label>Source</label><select name="source" class="form-control"><option>Website</option><option>Referral</option><option>Trade Show</option><option>Social Media</option><option>Cold Call</option></select></div>' +
-        '</div>' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>Expected Revenue</label><input name="expected_revenue" type="number" class="form-control" value="0"></div>' +
-            '<div class="form-group"><label>Probability %</label><input name="probability" type="number" class="form-control" value="10" min="0" max="100"></div>' +
-        '</div>' +
-        '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control"></textarea></div>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="saveLead()">Create Lead</button>'
-    );
-}
-
-async function saveLead() {
+async function loadDashboard() {
     try {
-        const data = getFormData('lead-form');
-        if (data.contact_id) data.contact_id = parseInt(data.contact_id);
-        else delete data.contact_id;
-        await api('/api/crm/leads', { method: 'POST', body: data });
-        closeModal();
-        toast('Lead created');
-        navigate('crm');
-    } catch (e) { toast(e.message, 'error'); }
-}
-
-async function showLeadDetail(id) {
-    const lead = await api('/api/crm/leads/' + id);
-    const stages = ['new', 'qualified', 'proposition', 'won', 'lost'];
-    openModal('Lead: ' + lead.title,
-        '<div class="detail-grid">' +
-            '<div><div class="detail-field"><div class="detail-label">Contact</div><div class="detail-value">' + escHtml(lead.contact ? lead.contact.name : 'N/A') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Status</div><div class="detail-value">' + badge(lead.status) + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Expected Revenue</div><div class="detail-value">' + fmt(lead.expected_revenue) + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Probability</div><div class="detail-value">' + lead.probability + '%</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Source</div><div class="detail-value">' + escHtml(lead.source || 'N/A') + '</div></div></div>' +
-        '</div>' +
-        '<hr class="divider">' +
-        '<div class="form-group"><label>Move to Stage</label><select id="lead-stage" class="form-control">' +
-            stages.map(s => '<option value="' + s + '"' + (s === lead.status ? ' selected' : '') + '>' + s + '</option>').join('') +
-        '</select></div>' +
-        (lead.activities && lead.activities.length ? '<h4 class="mt-4 mb-2">Activities</h4>' +
-            lead.activities.map(a => '<div style="padding:6px 0;border-bottom:1px solid #eee;"><strong>' + escHtml(a.type) + '</strong>: ' + escHtml(a.summary) + '</div>').join('') : ''),
-        '<button class="btn btn-danger btn-sm" onclick="deleteLead(' + id + ')">Delete</button>' +
-        '<button class="btn btn-outline" onclick="closeModal()">Close</button>' +
-        '<button class="btn btn-primary" onclick="updateLeadStage(' + id + ')">Update Stage</button>'
-    );
-}
-
-async function updateLeadStage(id) {
-    try {
-        const status = document.getElementById('lead-stage').value;
-        await api('/api/crm/leads/' + id, { method: 'PUT', body: { status } });
-        closeModal();
-        toast('Lead updated');
-        navigate('crm');
-    } catch (e) { toast(e.message, 'error'); }
-}
-
-async function deleteLead(id) {
-    if (\!confirm('Delete this lead?')) return;
-    await api('/api/crm/leads/' + id, { method: 'DELETE' });
-    closeModal();
-    toast('Lead deleted');
-    navigate('crm');
-}
-
-
-// ── Sales Module ────────────────────────────────────────────────────────────
-
-async function renderSales(el) {
-    const [orders, dash] = await Promise.all([api('/api/sales/orders'), api('/api/sales/dashboard')]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Sales Orders</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewSaleOrder()">+ New Order</button></div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value">' + fmtN(dash.total_orders) + '</div></div>' +
-            '<div class="stat-card accent"><div class="stat-label">Total Revenue</div><div class="stat-value">' + fmt(dash.total_revenue) + '</div></div>' +
-            '<div class="stat-card success"><div class="stat-label">Avg Order Value</div><div class="stat-value">' + fmt(dash.avg_order_value) + '</div></div>' +
-        '</div>' +
-        '<div class="card"><div class="card-header">Orders</div><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Reference</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>Actions</th>' +
-        '</tr></thead><tbody>' +
-        orders.map(o => '<tr onclick="showSaleOrderDetail(' + o.id + ')">' +
-            '<td><strong>' + escHtml(o.reference) + '</strong></td>' +
-            '<td>' + escHtml(o.customer ? o.customer.name : 'N/A') + '</td>' +
-            '<td>' + escHtml(o.order_date || '') + '</td>' +
-            '<td><strong>' + fmt(o.total) + '</strong></td>' +
-            '<td>' + badge(o.status) + '</td>' +
-            '<td><button class="btn btn-sm btn-outline" onclick="event.stopPropagation();showSaleOrderDetail(' + o.id + ')">View</button></td>' +
-        '</tr>').join('') +
-        '</tbody></table></div></div>';
-}
-
-async function showNewSaleOrder() {
-    const [contacts, products] = await Promise.all([api('/api/contacts?type=customer'), api('/api/products')]);
-    const custOpts = contacts.map(c => '<option value="' + c.id + '">' + escHtml(c.name) + '</option>').join('');
-    const prodOpts = products.map(p => '<option value="' + p.id + '" data-price="' + p.sale_price + '">' + escHtml(p.name) + ' (' + fmt(p.sale_price) + ')</option>').join('');
-
-    openModal('New Sale Order',
-        '<form id="so-form">' +
-        '<div class="form-group"><label>Customer</label><select name="customer_id" class="form-control" required>' + custOpts + '</select></div>' +
-        '<hr class="divider"><h4 class="mb-2">Order Lines</h4>' +
-        '<div id="so-lines"><div class="form-row mb-2">' +
-            '<div class="form-group"><label>Product</label><select class="form-control so-product" onchange="soProductChanged(this)">' + prodOpts + '</select></div>' +
-            '<div class="form-group"><label>Qty</label><input type="number" class="form-control so-qty" value="1" min="1"></div>' +
-        '</div></div>' +
-        '<button type="button" class="btn btn-sm btn-outline" onclick="addSOLine()">+ Add Line</button>' +
-        '<div class="form-group mt-4"><label>Notes</label><textarea name="notes" class="form-control"></textarea></div>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="saveSaleOrder()">Create Order</button>'
-    );
-    window._soProdOpts = prodOpts;
-}
-
-function addSOLine() {
-    const div = document.getElementById('so-lines');
-    div.insertAdjacentHTML('beforeend', '<div class="form-row mb-2">' +
-        '<div class="form-group"><label>Product</label><select class="form-control so-product" onchange="soProductChanged(this)">' + window._soProdOpts + '</select></div>' +
-        '<div class="form-group"><label>Qty</label><input type="number" class="form-control so-qty" value="1" min="1"></div>' +
-    '</div>');
-}
-
-function soProductChanged(sel) {}
-
-async function saveSaleOrder() {
-    try {
-        const form = document.getElementById('so-form');
-        const customer_id = parseInt(form.querySelector('[name=customer_id]').value);
-        const notes = form.querySelector('[name=notes]').value;
-        const prods = form.querySelectorAll('.so-product');
-        const qtys = form.querySelectorAll('.so-qty');
-        const lines = [];
-        prods.forEach((p, i) => {
-            lines.push({ product_id: parseInt(p.value), quantity: parseFloat(qtys[i].value) || 1 });
-        });
-        await api('/api/sales/orders', { method: 'POST', body: { customer_id, notes, lines } });
-        closeModal();
-        toast('Sale order created');
-        navigate('sales');
-    } catch (e) { toast(e.message, 'error'); }
-}
-
-async function showSaleOrderDetail(id) {
-    const o = await api('/api/sales/orders/' + id);
-    openModal('Order ' + o.reference,
-        '<div class="detail-grid">' +
-            '<div><div class="detail-field"><div class="detail-label">Customer</div><div class="detail-value">' + escHtml(o.customer ? o.customer.name : '') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Status</div><div class="detail-value">' + badge(o.status) + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Date</div><div class="detail-value">' + escHtml(o.order_date || '') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Total</div><div class="detail-value" style="font-size:18px;color:var(--primary);">' + fmt(o.total) + '</div></div></div>' +
-        '</div>' +
-        '<hr class="divider"><h4 class="mb-2">Lines</h4>' +
-        '<table><thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' +
-        (o.lines || []).map(l => '<tr><td>' + escHtml(l.description || (l.product ? l.product.name : '')) + '</td><td>' + l.quantity + '</td><td>' + fmt(l.unit_price) + '</td><td>' + fmt(l.subtotal) + '</td></tr>').join('') +
-        '</tbody></table>' +
-        '<div style="text-align:right;margin-top:8px;"><strong>Subtotal:</strong> ' + fmt(o.subtotal) + ' | <strong>Tax:</strong> ' + fmt(o.tax) + ' | <strong>Total:</strong> ' + fmt(o.total) + '</div>',
-        (o.status === 'draft' ? '<button class="btn btn-success" onclick="confirmSO(' + id + ')">Confirm</button> ' : '') +
-        (o.status === 'confirmed' ? '<button class="btn btn-accent" onclick="deliverSO(' + id + ')">Deliver</button> ' : '') +
-        (o.status === 'delivered' ? '<button class="btn btn-primary" onclick="invoiceSO(' + id + ')">Create Invoice</button> ' : '') +
-        '<button class="btn btn-outline" onclick="closeModal()">Close</button>'
-    );
-}
-
-async function confirmSO(id) { await api('/api/sales/orders/' + id + '/confirm', { method: 'POST' }); closeModal(); toast('Order confirmed'); navigate('sales'); }
-async function deliverSO(id) { await api('/api/sales/orders/' + id + '/deliver', { method: 'POST' }); closeModal(); toast('Order delivered'); navigate('sales'); }
-async function invoiceSO(id) { await api('/api/sales/orders/' + id + '/invoice', { method: 'POST' }); closeModal(); toast('Invoice created'); navigate('sales'); }
-
-
-// ── POS Module ──────────────────────────────────────────────────────────────
-
-async function renderPOS(el) {
-    const products = await api('/api/pos/products');
-    posCart = [];
-    const categoryIcons = { Sofa: '&#128715;', Table: '&#9638;', Chair: '&#9641;', Bed: '&#9644;',
-        Cabinet: '&#9635;', Shelf: '&#9636;', Desk: '&#9634;', Outdoor: '&#9728;', Accessory: '&#9733;' };
-
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Point of Sale</h1></div>' +
-        '<div class="pos-layout">' +
-            '<div><div style="margin-bottom:12px;"><input type="text" class="form-control" placeholder="Search products..." oninput="filterPOSProducts(this.value)"></div>' +
-            '<div class="pos-products-grid" id="pos-grid">' +
-            products.map(p => '<div class="pos-product-card" data-name="' + escHtml(p.name).toLowerCase() + '" onclick="addToCart(' + p.id + ','' + escHtml(p.name).replace(/'/g, '') + '',' + p.sale_price + ')">' +
-                '<div class="pos-product-icon">' + (categoryIcons[p.category] || '&#9642;') + '</div>' +
-                '<div class="pos-product-name">' + escHtml(p.name) + '</div>' +
-                '<div class="pos-product-price">' + fmt(p.sale_price) + '</div>' +
-            '</div>').join('') +
-            '</div></div>' +
-            '<div class="pos-cart">' +
-                '<div class="pos-cart-header">Current Order</div>' +
-                '<div class="pos-cart-items" id="pos-cart-items"><div class="empty-state"><p>No items yet</p></div></div>' +
-                '<div class="pos-cart-footer">' +
-                    '<div id="pos-totals">' +
-                        '<div class="pos-totals-row"><span>Subtotal</span><span id="pos-subtotal">' + fmt(0) + '</span></div>' +
-                        '<div class="pos-totals-row"><span>Tax (10%)</span><span id="pos-tax">' + fmt(0) + '</span></div>' +
-                        '<div class="pos-totals-row total"><span>Total</span><span id="pos-total">' + fmt(0) + '</span></div>' +
-                    '</div>' +
-                    '<div class="pos-payment-buttons">' +
-                        '<button class="btn btn-success" onclick="completePOSOrder('cash')">Cash</button>' +
-                        '<button class="btn btn-primary" onclick="completePOSOrder('card')">Card</button>' +
-                    '</div>' +
-                '</div>' +
-            '</div>' +
-        '</div>';
-}
-
-function filterPOSProducts(q) {
-    document.querySelectorAll('.pos-product-card').forEach(c => {
-        c.style.display = c.dataset.name.includes(q.toLowerCase()) ? '' : 'none';
-    });
-}
-
-function addToCart(id, name, price) {
-    const existing = posCart.find(i => i.id === id);
-    if (existing) { existing.qty++; }
-    else { posCart.push({ id, name, price, qty: 1 }); }
-    renderCart();
-}
-
-function updateCartQty(id, delta) {
-    const item = posCart.find(i => i.id === id);
-    if (!item) return;
-    item.qty += delta;
-    if (item.qty <= 0) posCart = posCart.filter(i => i.id !== id);
-    renderCart();
-}
-
-function renderCart() {
-    const el = document.getElementById('pos-cart-items');
-    if (!posCart.length) {
-        el.innerHTML = '<div class="empty-state"><p>No items yet</p></div>';
-    } else {
-        el.innerHTML = posCart.map(i => '<div class="pos-cart-item">' +
-            '<div class="pos-cart-item-info"><div class="pos-cart-item-name">' + escHtml(i.name) + '</div>' +
-            '<div class="pos-cart-item-price">' + fmt(i.price) + ' each</div></div>' +
-            '<div class="pos-cart-item-qty">' +
-                '<button onclick="updateCartQty(' + i.id + ',-1)">-</button>' +
-                '<span>' + i.qty + '</span>' +
-                '<button onclick="updateCartQty(' + i.id + ',1)">+</button>' +
-            '</div>' +
-            '<div class="pos-cart-item-subtotal">' + fmt(i.price * i.qty) + '</div>' +
-        '</div>').join('');
+        const [data, charts] = await Promise.all([
+            api('/api/dashboard'),
+            api('/api/dashboard/charts'),
+        ]);
+        renderDashboard(data, charts);
+    } catch (err) {
+        document.getElementById('page-content').innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
     }
-    const subtotal = posCart.reduce((s, i) => s + i.price * i.qty, 0);
-    const tax = subtotal * 0.1;
-    document.getElementById('pos-subtotal').textContent = fmt(subtotal);
-    document.getElementById('pos-tax').textContent = fmt(tax);
-    document.getElementById('pos-total').textContent = fmt(subtotal + tax);
 }
 
-async function completePOSOrder(method) {
-    if (!posCart.length) { toast('Add items to cart first', 'error'); return; }
-    try {
-        const lines = posCart.map(i => ({ product_id: i.id, quantity: i.qty, unit_price: i.price }));
-        await api('/api/pos/orders', { method: 'POST', body: { payment_method: method, lines } });
-        posCart = [];
-        toast('Order completed!');
-        renderCart();
-    } catch (e) { toast(e.message, 'error'); }
-}
+function renderDashboard(data, charts) {
+    const profitClass = v => v >= 0 ? 'positive' : 'negative';
+    const profitSign = v => v >= 0 ? '+' : '';
 
+    let html = `
+    <div class="kpi-grid">
+        <div class="kpi-card sales">
+            <div class="kpi-label">Today's Sales</div>
+            <div class="kpi-value">${formatOMR(data.today.sales)}</div>
+        </div>
+        <div class="kpi-card expenses">
+            <div class="kpi-label">Today's Expenses</div>
+            <div class="kpi-value">${formatOMR(data.today.expenses)}</div>
+        </div>
+        <div class="kpi-card profit">
+            <div class="kpi-label">Today's Profit</div>
+            <div class="kpi-value ${profitClass(data.today.profit)}">${profitSign(data.today.profit)}${formatOMR(data.today.profit)}</div>
+        </div>
+        <div class="kpi-card sales">
+            <div class="kpi-label">This Month Sales</div>
+            <div class="kpi-value">${formatOMR(data.month.sales)}</div>
+        </div>
+        <div class="kpi-card expenses">
+            <div class="kpi-label">This Month Expenses</div>
+            <div class="kpi-value">${formatOMR(data.month.expenses)}</div>
+        </div>
+        <div class="kpi-card profit">
+            <div class="kpi-label">Net Profit (Month)</div>
+            <div class="kpi-value ${profitClass(data.month.profit)}">${profitSign(data.month.profit)}${formatOMR(data.month.profit)}</div>
+        </div>
+    </div>
 
-// ── Accounting Module ───────────────────────────────────────────────────────
+    <div class="chart-grid">
+        <div class="chart-card">
+            <h4>Monthly Sales vs Expenses (${new Date().getFullYear()})</h4>
+            <div class="chart-wrapper"><canvas id="chart-monthly"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <h4>Expense Breakdown by Category</h4>
+            <div class="chart-wrapper"><canvas id="chart-expense-pie"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <h4>Daily Cash Flow (Last 30 Days)</h4>
+            <div class="chart-wrapper"><canvas id="chart-cashflow"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <h4>Monthly Profit</h4>
+            <div class="chart-wrapper"><canvas id="chart-profit"></canvas></div>
+        </div>
+    </div>
 
-async function renderAccounting(el) {
-    const [dash, invoices] = await Promise.all([api('/api/accounting/dashboard'), api('/api/accounting/invoices')]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Accounting</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewInvoice()">+ New Invoice</button></div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card success"><div class="stat-label">Total Income</div><div class="stat-value">' + fmt(dash.total_income) + '</div></div>' +
-            '<div class="stat-card danger"><div class="stat-label">Total Expenses</div><div class="stat-value">' + fmt(dash.total_expenses) + '</div></div>' +
-            '<div class="stat-card accent"><div class="stat-label">Net Profit</div><div class="stat-value">' + fmt(dash.net_profit) + '</div></div>' +
-            '<div class="stat-card warning"><div class="stat-label">Receivable</div><div class="stat-value">' + fmt(dash.accounts_receivable) + '</div></div>' +
-            '<div class="stat-card info"><div class="stat-label">Payable</div><div class="stat-value">' + fmt(dash.accounts_payable) + '</div></div>' +
-            '<div class="stat-card danger"><div class="stat-label">Overdue</div><div class="stat-value">' + fmtN(dash.overdue_invoices) + '</div></div>' +
-        '</div>' +
-        '<div class="tabs">' +
-            '<div class="tab active" onclick="filterInvoices(this,'all')">All</div>' +
-            '<div class="tab" onclick="filterInvoices(this,'customer')">Customer Invoices</div>' +
-            '<div class="tab" onclick="filterInvoices(this,'vendor')">Vendor Bills</div>' +
-        '</div>' +
-        '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Reference</th><th>Contact</th><th>Type</th><th>Date</th><th>Total</th><th>Paid</th><th>Status</th>' +
-        '</tr></thead><tbody id="invoices-tbody">' +
-        invoices.map(i => invoiceRow(i)).join('') +
-        '</tbody></table></div></div>';
-    window._allInvoices = invoices;
-}
+    <div class="card">
+        <div class="card-header"><h3>Recent Activity</h3></div>
+        <ul class="activity-list">
+            ${data.recent_activity.length === 0 ? '<li class="empty-state"><p>No recent activity</p></li>' :
+              data.recent_activity.map(a => `
+                <li class="activity-item">
+                    <div class="activity-dot ${a.type}"></div>
+                    <div class="activity-info">
+                        <div class="activity-desc">${esc(a.description)}</div>
+                        <div class="activity-meta">${a.type === 'sale' ? 'Sale' : 'Expense'} &middot; ${formatDate(a.date)} &middot; ${esc(a.employee || '')}</div>
+                    </div>
+                    <div class="activity-amount ${a.type === 'sale' ? 'amount-positive' : 'amount-negative'}">
+                        ${a.type === 'sale' ? '+' : '-'}${formatOMR(a.amount)}
+                    </div>
+                </li>
+              `).join('')}
+        </ul>
+    </div>`;
 
-function invoiceRow(i) {
-    return '<tr class="inv-row" data-type="' + i.type + '" onclick="showInvoiceDetail(' + i.id + ')">' +
-        '<td><strong>' + escHtml(i.reference) + '</strong></td>' +
-        '<td>' + escHtml(i.contact ? i.contact.name : '') + '</td>' +
-        '<td>' + escHtml(i.type) + '</td>' +
-        '<td>' + escHtml(i.invoice_date || '') + '</td>' +
-        '<td>' + fmt(i.total) + '</td>' +
-        '<td>' + fmt(i.amount_paid) + '</td>' +
-        '<td>' + badge(i.status) + '</td></tr>';
-}
+    document.getElementById('page-content').innerHTML = html;
 
-function filterInvoices(tab, type) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    document.querySelectorAll('.inv-row').forEach(r => {
-        r.style.display = (type === 'all' || r.dataset.type === type) ? '' : 'none';
+    // Render charts
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    // Monthly Sales vs Expenses Bar Chart
+    chartInstances.monthly = new Chart(document.getElementById('chart-monthly'), {
+        type: 'bar',
+        data: {
+            labels: months,
+            datasets: [
+                { label: 'Sales', data: charts.monthly.map(m => m.sales), backgroundColor: '#00A09D' },
+                { label: 'Expenses', data: charts.monthly.map(m => m.expenses), backgroundColor: '#dc3545' },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true } },
+        }
     });
-}
 
-async function showNewInvoice() {
-    const contacts = await api('/api/contacts');
-    const opts = contacts.map(c => '<option value="' + c.id + '">' + escHtml(c.name) + '</option>').join('');
-    openModal('New Invoice',
-        '<form id="inv-form">' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>Type</label><select name="type" class="form-control"><option value="customer">Customer Invoice</option><option value="vendor">Vendor Bill</option></select></div>' +
-            '<div class="form-group"><label>Contact</label><select name="contact_id" class="form-control">' + opts + '</select></div>' +
-        '</div>' +
-        '<hr class="divider"><h4 class="mb-2">Lines</h4>' +
-        '<div id="inv-lines"><div class="form-row mb-2">' +
-            '<div class="form-group"><label>Description</label><input class="form-control inv-desc"></div>' +
-            '<div class="form-group"><label>Qty</label><input type="number" class="form-control inv-qty" value="1"></div>' +
-            '<div class="form-group"><label>Unit Price</label><input type="number" class="form-control inv-price" value="0"></div>' +
-        '</div></div>' +
-        '<button type="button" class="btn btn-sm btn-outline" onclick="addInvLine()">+ Add Line</button>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="saveInvoice()">Create</button>'
-    );
-}
-
-function addInvLine() {
-    document.getElementById('inv-lines').insertAdjacentHTML('beforeend',
-        '<div class="form-row mb-2">' +
-            '<div class="form-group"><label>Description</label><input class="form-control inv-desc"></div>' +
-            '<div class="form-group"><label>Qty</label><input type="number" class="form-control inv-qty" value="1"></div>' +
-            '<div class="form-group"><label>Unit Price</label><input type="number" class="form-control inv-price" value="0"></div>' +
-        '</div>');
-}
-
-async function saveInvoice() {
-    try {
-        const form = document.getElementById('inv-form');
-        const data = {
-            type: form.querySelector('[name=type]').value,
-            contact_id: parseInt(form.querySelector('[name=contact_id]').value),
-            lines: []
-        };
-        const descs = form.querySelectorAll('.inv-desc');
-        const qtys = form.querySelectorAll('.inv-qty');
-        const prices = form.querySelectorAll('.inv-price');
-        descs.forEach((d, i) => {
-            data.lines.push({ description: d.value, quantity: parseFloat(qtys[i].value) || 1, unit_price: parseFloat(prices[i].value) || 0 });
+    // Expense Pie Chart
+    const pieColors = ['#714B67','#00A09D','#dc3545','#ffc107','#17a2b8','#28a745','#6f42c1','#fd7e14','#20c997','#e83e8c','#6c757d','#343a40','#007bff','#795548','#9e9e9e'];
+    if (charts.expense_by_category.length > 0) {
+        chartInstances.pie = new Chart(document.getElementById('chart-expense-pie'), {
+            type: 'doughnut',
+            data: {
+                labels: charts.expense_by_category.map(e => e.category),
+                datasets: [{
+                    data: charts.expense_by_category.map(e => e.amount),
+                    backgroundColor: pieColors.slice(0, charts.expense_by_category.length),
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } },
+            }
         });
-        await api('/api/accounting/invoices', { method: 'POST', body: data });
-        closeModal(); toast('Invoice created'); navigate('accounting');
-    } catch (e) { toast(e.message, 'error'); }
-}
+    }
 
-async function showInvoiceDetail(id) {
-    const inv = await api('/api/accounting/invoices/' + id);
-    openModal('Invoice ' + inv.reference,
-        '<div class="detail-grid">' +
-            '<div><div class="detail-field"><div class="detail-label">Contact</div><div class="detail-value">' + escHtml(inv.contact ? inv.contact.name : '') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Status</div><div class="detail-value">' + badge(inv.status) + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Total</div><div class="detail-value" style="font-size:18px;">' + fmt(inv.total) + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Paid</div><div class="detail-value">' + fmt(inv.amount_paid) + '</div></div></div>' +
-        '</div>' +
-        '<hr class="divider"><h4 class="mb-2">Lines</h4>' +
-        '<table><thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' +
-        (inv.lines || []).map(l => '<tr><td>' + escHtml(l.description) + '</td><td>' + l.quantity + '</td><td>' + fmt(l.unit_price) + '</td><td>' + fmt(l.subtotal) + '</td></tr>').join('') +
-        '</tbody></table>' +
-        (inv.status \!== 'paid' ? '<hr class="divider"><h4 class="mb-2">Register Payment</h4>' +
-            '<div class="form-row"><div class="form-group"><label>Amount</label><input type="number" id="pay-amount" class="form-control" value="' + (inv.total - inv.amount_paid).toFixed(2) + '"></div>' +
-            '<div class="form-group"><label>Method</label><select id="pay-method" class="form-control"><option value="bank_transfer">Bank Transfer</option><option value="cash">Cash</option><option value="card">Card</option><option value="check">Check</option></select></div></div>' : ''),
-        (inv.status === 'draft' ? '<button class="btn btn-accent" onclick="sendInvoice(' + id + ')">Send</button> ' : '') +
-        (inv.status \!== 'paid' ? '<button class="btn btn-success" onclick="payInvoice(' + id + ')">Pay</button> ' : '') +
-        '<button class="btn btn-outline" onclick="closeModal()">Close</button>'
-    );
-}
+    // Daily Cash Flow Line Chart
+    chartInstances.cashflow = new Chart(document.getElementById('chart-cashflow'), {
+        type: 'line',
+        data: {
+            labels: charts.daily_cash_flow.map(d => d.date.slice(5)),
+            datasets: [
+                { label: 'Sales', data: charts.daily_cash_flow.map(d => d.sales), borderColor: '#00A09D', backgroundColor: 'rgba(0,160,157,0.1)', fill: true, tension: 0.3 },
+                { label: 'Expenses', data: charts.daily_cash_flow.map(d => d.expenses), borderColor: '#dc3545', backgroundColor: 'rgba(220,53,69,0.1)', fill: true, tension: 0.3 },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true } },
+        }
+    });
 
-async function sendInvoice(id) { await api('/api/accounting/invoices/' + id + '/send', { method: 'POST' }); closeModal(); toast('Invoice sent'); navigate('accounting'); }
-
-async function payInvoice(id) {
-    try {
-        const amount = parseFloat(document.getElementById('pay-amount').value);
-        const method = document.getElementById('pay-method').value;
-        await api('/api/accounting/invoices/' + id + '/payments', { method: 'POST', body: { amount, method } });
-        closeModal(); toast('Payment registered'); navigate('accounting');
-    } catch (e) { toast(e.message, 'error'); }
-}
-
-
-// ── Inventory Module ────────────────────────────────────────────────────────
-
-async function renderInventory(el) {
-    const [stock, dash] = await Promise.all([api('/api/inventory/stock'), api('/api/inventory/dashboard')]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Inventory</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showStockAdjustment()">+ Stock Adjustment</button></div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-label">Total Products</div><div class="stat-value">' + fmtN(dash.total_products) + '</div></div>' +
-            '<div class="stat-card accent"><div class="stat-label">Stock Value</div><div class="stat-value">' + fmt(dash.total_stock_value) + '</div></div>' +
-            '<div class="stat-card warning"><div class="stat-label">Low Stock Items</div><div class="stat-value">' + dash.low_stock_items.length + '</div></div>' +
-            '<div class="stat-card info"><div class="stat-label">Warehouses</div><div class="stat-value">' + fmtN(dash.warehouses) + '</div></div>' +
-        '</div>' +
-        '<div class="card"><div class="card-header">Stock Levels</div><div class="table-wrapper"><table><thead><tr>' +
-            '<th>SKU</th><th>Product</th><th>Category</th><th>On Hand</th><th>Value</th>' +
-        '</tr></thead><tbody>' +
-        stock.map(s => '<tr><td>' + escHtml(s.sku || '') + '</td><td><strong>' + escHtml(s.product_name) + '</strong></td>' +
-            '<td>' + escHtml(s.category || '') + '</td>' +
-            '<td><span style="color:' + (s.on_hand <= 5 ? 'var(--danger)' : 'var(--success)') + ';font-weight:600;">' + s.on_hand + '</span></td>' +
-            '<td>' + fmt(s.cost_value) + '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>';
-}
-
-async function showStockAdjustment() {
-    const products = await api('/api/products');
-    const opts = products.map(p => '<option value="' + p.id + '">' + escHtml(p.name) + '</option>').join('');
-    openModal('Stock Adjustment',
-        '<form id="stock-form">' +
-        '<div class="form-group"><label>Product</label><select name="product_id" class="form-control">' + opts + '</select></div>' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>Type</label><select name="type" class="form-control"><option value="in">Stock In</option><option value="out">Stock Out</option></select></div>' +
-            '<div class="form-group"><label>Quantity</label><input name="quantity" type="number" class="form-control" value="1" min="1"></div>' +
-        '</div>' +
-        '<div class="form-group"><label>Reference</label><input name="reference" class="form-control" placeholder="e.g. ADJ-001"></div>' +
-        '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control"></textarea></div>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="saveStockMove()">Save</button>'
-    );
-}
-
-async function saveStockMove() {
-    try {
-        const data = getFormData('stock-form');
-        data.product_id = parseInt(data.product_id);
-        data.warehouse_id = 1;
-        await api('/api/inventory/moves', { method: 'POST', body: data });
-        closeModal(); toast('Stock updated'); navigate('inventory');
-    } catch (e) { toast(e.message, 'error'); }
-}
-
-// ── Purchase Module ─────────────────────────────────────────────────────────
-
-async function renderPurchase(el) {
-    const [orders, dash] = await Promise.all([api('/api/purchase/orders'), api('/api/purchase/dashboard')]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Purchase Orders</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewPO()">+ New PO</button></div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value">' + fmtN(dash.total_orders) + '</div></div>' +
-            '<div class="stat-card accent"><div class="stat-label">Total Spent</div><div class="stat-value">' + fmt(dash.total_spent) + '</div></div>' +
-            '<div class="stat-card warning"><div class="stat-label">Pending</div><div class="stat-value">' + fmtN(dash.pending_orders) + '</div></div>' +
-        '</div>' +
-        '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Reference</th><th>Vendor</th><th>Date</th><th>Total</th><th>Status</th><th>Actions</th>' +
-        '</tr></thead><tbody>' +
-        orders.map(o => '<tr onclick="showPODetail(' + o.id + ')">' +
-            '<td><strong>' + escHtml(o.reference) + '</strong></td>' +
-            '<td>' + escHtml(o.vendor ? o.vendor.name : '') + '</td>' +
-            '<td>' + escHtml(o.order_date || '') + '</td>' +
-            '<td>' + fmt(o.total) + '</td>' +
-            '<td>' + badge(o.status) + '</td>' +
-            '<td><button class="btn btn-sm btn-outline" onclick="event.stopPropagation();showPODetail(' + o.id + ')">View</button></td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>';
-}
-
-async function showNewPO() {
-    const [vendors, products] = await Promise.all([api('/api/contacts?type=vendor'), api('/api/products')]);
-    const vendorOpts = vendors.map(v => '<option value="' + v.id + '">' + escHtml(v.name) + '</option>').join('');
-    const prodOpts = products.map(p => '<option value="' + p.id + '" data-price="' + p.cost_price + '">' + escHtml(p.name) + ' (' + fmt(p.cost_price) + ')</option>').join('');
-    openModal('New Purchase Order',
-        '<form id="po-form">' +
-        '<div class="form-group"><label>Vendor</label><select name="vendor_id" class="form-control">' + vendorOpts + '</select></div>' +
-        '<hr class="divider"><h4 class="mb-2">Lines</h4>' +
-        '<div id="po-lines"><div class="form-row mb-2">' +
-            '<div class="form-group"><label>Product</label><select class="form-control po-product">' + prodOpts + '</select></div>' +
-            '<div class="form-group"><label>Qty</label><input type="number" class="form-control po-qty" value="1" min="1"></div>' +
-        '</div></div>' +
-        '<button type="button" class="btn btn-sm btn-outline" onclick="addPOLine()">+ Add Line</button>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="savePO()">Create PO</button>'
-    );
-    window._poProdOpts = prodOpts;
-}
-
-function addPOLine() {
-    document.getElementById('po-lines').insertAdjacentHTML('beforeend',
-        '<div class="form-row mb-2"><div class="form-group"><label>Product</label><select class="form-control po-product">' + window._poProdOpts + '</select></div>' +
-        '<div class="form-group"><label>Qty</label><input type="number" class="form-control po-qty" value="1" min="1"></div></div>');
-}
-
-async function savePO() {
-    try {
-        const form = document.getElementById('po-form');
-        const data = { vendor_id: parseInt(form.querySelector('[name=vendor_id]').value), lines: [] };
-        const prods = form.querySelectorAll('.po-product');
-        const qtys = form.querySelectorAll('.po-qty');
-        prods.forEach((p, i) => { data.lines.push({ product_id: parseInt(p.value), quantity: parseFloat(qtys[i].value) || 1 }); });
-        await api('/api/purchase/orders', { method: 'POST', body: data });
-        closeModal(); toast('Purchase order created'); navigate('purchase');
-    } catch (e) { toast(e.message, 'error'); }
-}
-
-async function showPODetail(id) {
-    const po = await api('/api/purchase/orders/' + id);
-    openModal('PO ' + po.reference,
-        '<div class="detail-grid">' +
-            '<div><div class="detail-field"><div class="detail-label">Vendor</div><div class="detail-value">' + escHtml(po.vendor ? po.vendor.name : '') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Status</div><div class="detail-value">' + badge(po.status) + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Total</div><div class="detail-value" style="font-size:18px;">' + fmt(po.total) + '</div></div></div>' +
-        '</div>' +
-        '<hr class="divider"><h4 class="mb-2">Lines</h4>' +
-        '<table><thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' +
-        (po.lines || []).map(l => '<tr><td>' + escHtml(l.description || (l.product ? l.product.name : '')) + '</td><td>' + l.quantity + '</td><td>' + fmt(l.unit_price) + '</td><td>' + fmt(l.subtotal) + '</td></tr>').join('') +
-        '</tbody></table>',
-        (po.status === 'draft' ? '<button class="btn btn-accent" onclick="sendPO(' + id + ')">Send to Vendor</button> ' : '') +
-        (po.status === 'sent' ? '<button class="btn btn-success" onclick="receivePO(' + id + ')">Mark Received</button> ' : '') +
-        '<button class="btn btn-outline" onclick="closeModal()">Close</button>'
-    );
-}
-
-async function sendPO(id) { await api('/api/purchase/orders/' + id + '/send', { method: 'POST' }); closeModal(); toast('PO sent'); navigate('purchase'); }
-async function receivePO(id) { await api('/api/purchase/orders/' + id + '/receive', { method: 'POST' }); closeModal(); toast('PO received, stock updated, bill created'); navigate('purchase'); }
-
-
-// ── Manufacturing Module ────────────────────────────────────────────────────
-
-async function renderManufacturing(el) {
-    const [orders, boms, dash] = await Promise.all([
-        api('/api/manufacturing/orders'), api('/api/manufacturing/bom'), api('/api/manufacturing/dashboard')
-    ]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Manufacturing</h1>' +
-        '<div class="page-actions">' +
-            '<button class="btn btn-outline" onclick="showNewBOM()">+ New BOM</button>' +
-            '<button class="btn btn-primary" onclick="showNewMO()">+ New MO</button>' +
-        '</div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value">' + fmtN(dash.total_orders) + '</div></div>' +
-            '<div class="stat-card warning"><div class="stat-label">In Progress</div><div class="stat-value">' + fmtN(dash.in_progress) + '</div></div>' +
-            '<div class="stat-card success"><div class="stat-label">Completed</div><div class="stat-value">' + fmtN(dash.completed) + '</div></div>' +
-            '<div class="stat-card info"><div class="stat-label">Active BOMs</div><div class="stat-value">' + fmtN(dash.active_boms) + '</div></div>' +
-        '</div>' +
-        '<div class="tabs">' +
-            '<div class="tab active" onclick="showMfgTab(this,'orders')">Manufacturing Orders</div>' +
-            '<div class="tab" onclick="showMfgTab(this,'bom')">Bills of Materials</div>' +
-        '</div>' +
-        '<div id="mfg-orders" class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Reference</th><th>Product</th><th>Qty</th><th>Status</th><th>Start</th><th>Actions</th>' +
-        '</tr></thead><tbody>' +
-        orders.map(o => '<tr><td><strong>' + escHtml(o.reference) + '</strong></td>' +
-            '<td>' + escHtml(o.bom && o.bom.product ? o.bom.product.name : '') + '</td>' +
-            '<td>' + o.quantity + '</td><td>' + badge(o.status) + '</td>' +
-            '<td>' + escHtml(o.actual_start || o.planned_start || '') + '</td>' +
-            '<td>' +
-                (o.status === 'draft' ? '<button class="btn btn-sm btn-warning" onclick="startMO(' + o.id + ')">Start</button> ' : '') +
-                (o.status === 'in_progress' ? '<button class="btn btn-sm btn-success" onclick="completeMO(' + o.id + ')">Complete</button>' : '') +
-            '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>' +
-        '<div id="mfg-bom" style="display:none;" class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>BOM Name</th><th>Product</th><th>Components</th><th>Qty</th>' +
-        '</tr></thead><tbody>' +
-        boms.map(b => '<tr onclick="showBOMDetail(' + b.id + ')">' +
-            '<td><strong>' + escHtml(b.name) + '</strong></td>' +
-            '<td>' + escHtml(b.product ? b.product.name : '') + '</td>' +
-            '<td>' + (b.lines ? b.lines.length : 0) + ' items</td>' +
-            '<td>' + b.quantity + '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>';
-}
-
-function showMfgTab(tab, which) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById('mfg-orders').style.display = which === 'orders' ? '' : 'none';
-    document.getElementById('mfg-bom').style.display = which === 'bom' ? '' : 'none';
-}
-
-async function startMO(id) { await api('/api/manufacturing/orders/' + id + '/start', { method: 'POST' }); toast('MO started, materials consumed'); navigate('manufacturing'); }
-async function completeMO(id) { await api('/api/manufacturing/orders/' + id + '/complete', { method: 'POST' }); toast('MO completed, products added to stock'); navigate('manufacturing'); }
-
-async function showNewBOM() {
-    const products = await api('/api/products');
-    const finishedOpts = products.filter(p => p.category \!== 'Raw Material').map(p => '<option value="' + p.id + '">' + escHtml(p.name) + '</option>').join('');
-    const matOpts = products.map(p => '<option value="' + p.id + '">' + escHtml(p.name) + '</option>').join('');
-    openModal('New Bill of Materials',
-        '<form id="bom-form">' +
-        '<div class="form-group"><label>Product (Output)</label><select name="product_id" class="form-control">' + finishedOpts + '</select></div>' +
-        '<div class="form-group"><label>BOM Name</label><input name="name" class="form-control"></div>' +
-        '<hr class="divider"><h4 class="mb-2">Components</h4>' +
-        '<div id="bom-lines"><div class="form-row mb-2">' +
-            '<div class="form-group"><label>Material</label><select class="form-control bom-mat">' + matOpts + '</select></div>' +
-            '<div class="form-group"><label>Qty</label><input type="number" class="form-control bom-qty" value="1"></div>' +
-        '</div></div>' +
-        '<button type="button" class="btn btn-sm btn-outline" onclick="addBOMLine()">+ Add Component</button>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="saveBOM()">Create BOM</button>'
-    );
-    window._bomMatOpts = matOpts;
-}
-
-function addBOMLine() {
-    document.getElementById('bom-lines').insertAdjacentHTML('beforeend',
-        '<div class="form-row mb-2"><div class="form-group"><label>Material</label><select class="form-control bom-mat">' + window._bomMatOpts + '</select></div>' +
-        '<div class="form-group"><label>Qty</label><input type="number" class="form-control bom-qty" value="1"></div></div>');
-}
-
-async function saveBOM() {
-    try {
-        const form = document.getElementById('bom-form');
-        const data = { product_id: parseInt(form.querySelector('[name=product_id]').value), name: form.querySelector('[name=name]').value, lines: [] };
-        const mats = form.querySelectorAll('.bom-mat');
-        const qtys = form.querySelectorAll('.bom-qty');
-        mats.forEach((m, i) => { data.lines.push({ product_id: parseInt(m.value), quantity: parseFloat(qtys[i].value) || 1 }); });
-        await api('/api/manufacturing/bom', { method: 'POST', body: data });
-        closeModal(); toast('BOM created'); navigate('manufacturing');
-    } catch (e) { toast(e.message, 'error'); }
-}
-
-async function showBOMDetail(id) {
-    const bom = await api('/api/manufacturing/bom/' + id);
-    openModal('BOM: ' + bom.name,
-        '<div class="detail-field"><div class="detail-label">Product</div><div class="detail-value">' + escHtml(bom.product ? bom.product.name : '') + '</div></div>' +
-        '<hr class="divider"><h4 class="mb-2">Components</h4>' +
-        '<table><thead><tr><th>Material</th><th>Qty</th><th>Notes</th></tr></thead><tbody>' +
-        (bom.lines || []).map(l => '<tr><td>' + escHtml(l.product ? l.product.name : '') + '</td><td>' + l.quantity + '</td><td>' + escHtml(l.notes || '') + '</td></tr>').join('') +
-        '</tbody></table>',
-        '<button class="btn btn-outline" onclick="closeModal()">Close</button>'
-    );
-}
-
-async function showNewMO() {
-    const boms = await api('/api/manufacturing/bom');
-    const opts = boms.map(b => '<option value="' + b.id + '">' + escHtml(b.name) + ' (' + escHtml(b.product ? b.product.name : '') + ')</option>').join('');
-    openModal('New Manufacturing Order',
-        '<form id="mo-form">' +
-        '<div class="form-group"><label>Bill of Materials</label><select name="bom_id" class="form-control">' + opts + '</select></div>' +
-        '<div class="form-group"><label>Quantity</label><input name="quantity" type="number" class="form-control" value="1" min="1"></div>' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>Planned Start</label><input name="planned_start" type="date" class="form-control"></div>' +
-            '<div class="form-group"><label>Planned End</label><input name="planned_end" type="date" class="form-control"></div>' +
-        '</div>' +
-        '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control"></textarea></div>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="saveMO()">Create MO</button>'
-    );
-}
-
-async function saveMO() {
-    try {
-        const data = getFormData('mo-form');
-        data.bom_id = parseInt(data.bom_id);
-        if (\!data.planned_start) delete data.planned_start;
-        if (\!data.planned_end) delete data.planned_end;
-        await api('/api/manufacturing/orders', { method: 'POST', body: data });
-        closeModal(); toast('Manufacturing order created'); navigate('manufacturing');
-    } catch (e) { toast(e.message, 'error'); }
-}
-
-
-// ── Email Marketing Module ──────────────────────────────────────────────────
-
-async function renderEmailMarketing(el) {
-    const [campaigns, lists, dash] = await Promise.all([
-        api('/api/marketing/email/campaigns'), api('/api/marketing/lists'), api('/api/marketing/dashboard')
-    ]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Email Marketing</h1>' +
-        '<div class="page-actions">' +
-            '<button class="btn btn-outline" onclick="showNewMailingList()">+ Mailing List</button>' +
-            '<button class="btn btn-primary" onclick="showNewEmailCampaign()">+ New Campaign</button>' +
-        '</div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-label">Campaigns</div><div class="stat-value">' + fmtN(dash.email_campaigns) + '</div></div>' +
-            '<div class="stat-card accent"><div class="stat-label">Emails Sent</div><div class="stat-value">' + fmtN(dash.total_emails_sent) + '</div></div>' +
-            '<div class="stat-card success"><div class="stat-label">Open Rate</div><div class="stat-value">' + dash.email_open_rate + '%</div></div>' +
-            '<div class="stat-card info"><div class="stat-label">Click Rate</div><div class="stat-value">' + dash.email_click_rate + '%</div></div>' +
-        '</div>' +
-        '<div class="tabs">' +
-            '<div class="tab active" onclick="showEmailTab(this,'campaigns')">Campaigns</div>' +
-            '<div class="tab" onclick="showEmailTab(this,'lists')">Mailing Lists</div>' +
-        '</div>' +
-        '<div id="email-campaigns" class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Name</th><th>Subject</th><th>List</th><th>Sent</th><th>Opened</th><th>Clicked</th><th>Status</th><th>Actions</th>' +
-        '</tr></thead><tbody>' +
-        campaigns.map(c => '<tr>' +
-            '<td><strong>' + escHtml(c.name) + '</strong></td>' +
-            '<td>' + escHtml(c.subject || '') + '</td>' +
-            '<td>' + escHtml(c.mailing_list ? c.mailing_list.name : '') + '</td>' +
-            '<td>' + fmtN(c.total_sent) + '</td>' +
-            '<td>' + fmtN(c.total_opened) + '</td>' +
-            '<td>' + fmtN(c.total_clicked) + '</td>' +
-            '<td>' + badge(c.status) + '</td>' +
-            '<td>' + (c.status === 'draft' ?
-                '<button class="btn btn-sm btn-success" onclick="sendEmailCampaign(' + c.id + ')">Send</button> ' +
-                '<button class="btn btn-sm btn-outline" onclick="editEmailCampaign(' + c.id + ')">Edit</button>' : '') + '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>' +
-        '<div id="email-lists" style="display:none;" class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Name</th><th>Description</th><th>Subscribers</th>' +
-        '</tr></thead><tbody>' +
-        lists.map(l => '<tr><td><strong>' + escHtml(l.name) + '</strong></td>' +
-            '<td>' + escHtml(l.description || '') + '</td>' +
-            '<td>' + fmtN(l.subscriber_count) + '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>';
-}
-
-function showEmailTab(tab, which) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById('email-campaigns').style.display = which === 'campaigns' ? '' : 'none';
-    document.getElementById('email-lists').style.display = which === 'lists' ? '' : 'none';
-}
-
-async function showNewMailingList() {
-    openModal('New Mailing List',
-        '<form id="ml-form">' +
-        '<div class="form-group"><label>Name</label><input name="name" class="form-control" required></div>' +
-        '<div class="form-group"><label>Description</label><textarea name="description" class="form-control"></textarea></div>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="saveMailingList()">Create</button>'
-    );
-}
-
-async function saveMailingList() {
-    try {
-        const data = getFormData('ml-form');
-        await api('/api/marketing/lists', { method: 'POST', body: data });
-        closeModal(); toast('Mailing list created'); navigate('email-marketing');
-    } catch (e) { toast(e.message, 'error'); }
-}
-
-async function showNewEmailCampaign() {
-    const lists = await api('/api/marketing/lists');
-    const opts = lists.map(l => '<option value="' + l.id + '">' + escHtml(l.name) + ' (' + l.subscriber_count + ' subscribers)</option>').join('');
-    openModal('New Email Campaign',
-        '<form id="ec-form">' +
-        '<div class="form-group"><label>Campaign Name</label><input name="name" class="form-control" required></div>' +
-        '<div class="form-group"><label>Subject Line</label><input name="subject" class="form-control" required></div>' +
-        '<div class="form-group"><label>Mailing List</label><select name="mailing_list_id" class="form-control">' + opts + '</select></div>' +
-        '<div class="form-group"><label>Email Body (HTML)</label><textarea name="body_html" class="form-control" rows="6" placeholder="<h1>Hello\!</h1><p>Your content here...</p>"></textarea></div>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="saveEmailCampaign()">Create Campaign</button>'
-    );
-}
-
-async function saveEmailCampaign() {
-    try {
-        const data = getFormData('ec-form');
-        data.mailing_list_id = parseInt(data.mailing_list_id);
-        await api('/api/marketing/email/campaigns', { method: 'POST', body: data });
-        closeModal(); toast('Campaign created'); navigate('email-marketing');
-    } catch (e) { toast(e.message, 'error'); }
-}
-
-async function editEmailCampaign(id) {
-    const c = await api('/api/marketing/email/campaigns/' + id);
-    const lists = await api('/api/marketing/lists');
-    const opts = lists.map(l => '<option value="' + l.id + '"' + (c.mailing_list_id === l.id ? ' selected' : '') + '>' + escHtml(l.name) + '</option>').join('');
-    openModal('Edit Campaign',
-        '<form id="ec-edit-form">' +
-        '<div class="form-group"><label>Name</label><input name="name" class="form-control" value="' + escHtml(c.name) + '"></div>' +
-        '<div class="form-group"><label>Subject</label><input name="subject" class="form-control" value="' + escHtml(c.subject || '') + '"></div>' +
-        '<div class="form-group"><label>Mailing List</label><select name="mailing_list_id" class="form-control">' + opts + '</select></div>' +
-        '<div class="form-group"><label>Body HTML</label><textarea name="body_html" class="form-control" rows="6">' + escHtml(c.body_html || '') + '</textarea></div>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="updateEmailCampaign(' + id + ')">Save</button>'
-    );
-}
-
-async function updateEmailCampaign(id) {
-    try {
-        const data = getFormData('ec-edit-form');
-        data.mailing_list_id = parseInt(data.mailing_list_id);
-        await api('/api/marketing/email/campaigns/' + id, { method: 'PUT', body: data });
-        closeModal(); toast('Campaign updated'); navigate('email-marketing');
-    } catch (e) { toast(e.message, 'error'); }
-}
-
-async function sendEmailCampaign(id) {
-    if (\!confirm('Send this email campaign to all subscribers?')) return;
-    await api('/api/marketing/email/campaigns/' + id + '/send', { method: 'POST' });
-    toast('Campaign sent\!'); navigate('email-marketing');
-}
-
-// ── SMS Marketing Module ────────────────────────────────────────────────────
-
-async function renderSMSMarketing(el) {
-    const [campaigns, lists, dash] = await Promise.all([
-        api('/api/marketing/sms/campaigns'), api('/api/marketing/lists'), api('/api/marketing/dashboard')
-    ]);
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">SMS Marketing</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewSMSCampaign()">+ New Campaign</button></div></div>' +
-        '<div class="stats-grid">' +
-            '<div class="stat-card"><div class="stat-label">SMS Campaigns</div><div class="stat-value">' + fmtN(dash.sms_campaigns) + '</div></div>' +
-            '<div class="stat-card accent"><div class="stat-label">Total SMS Sent</div><div class="stat-value">' + fmtN(dash.total_sms_sent) + '</div></div>' +
-            '<div class="stat-card info"><div class="stat-label">Subscribers</div><div class="stat-value">' + fmtN(dash.total_subscribers) + '</div></div>' +
-        '</div>' +
-        '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Name</th><th>Message</th><th>Sent</th><th>Delivered</th><th>Failed</th><th>Status</th><th>Actions</th>' +
-        '</tr></thead><tbody>' +
-        campaigns.map(c => '<tr>' +
-            '<td><strong>' + escHtml(c.name) + '</strong></td>' +
-            '<td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(c.message) + '</td>' +
-            '<td>' + fmtN(c.total_sent) + '</td><td>' + fmtN(c.total_delivered) + '</td><td>' + fmtN(c.total_failed) + '</td>' +
-            '<td>' + badge(c.status) + '</td>' +
-            '<td>' + (c.status === 'draft' ? '<button class="btn btn-sm btn-success" onclick="sendSMSCampaign(' + c.id + ')">Send</button>' : '') + '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>';
-}
-
-async function showNewSMSCampaign() {
-    const lists = await api('/api/marketing/lists');
-    const opts = lists.map(l => '<option value="' + l.id + '">' + escHtml(l.name) + ' (' + l.subscriber_count + ')</option>').join('');
-    openModal('New SMS Campaign',
-        '<form id="sms-form">' +
-        '<div class="form-group"><label>Campaign Name</label><input name="name" class="form-control" required></div>' +
-        '<div class="form-group"><label>Mailing List</label><select name="mailing_list_id" class="form-control">' + opts + '</select></div>' +
-        '<div class="form-group"><label>Message</label><textarea name="message" class="form-control" rows="4" maxlength="160" oninput="document.getElementById('sms-count').textContent=this.value.length+'/160'"></textarea><div class="sms-char-count" id="sms-count">0/160</div></div>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="saveSMSCampaign()">Create</button>'
-    );
-}
-
-async function saveSMSCampaign() {
-    try {
-        const data = getFormData('sms-form');
-        data.mailing_list_id = parseInt(data.mailing_list_id);
-        await api('/api/marketing/sms/campaigns', { method: 'POST', body: data });
-        closeModal(); toast('SMS campaign created'); navigate('sms-marketing');
-    } catch (e) { toast(e.message, 'error'); }
-}
-
-async function sendSMSCampaign(id) {
-    if (\!confirm('Send this SMS campaign?')) return;
-    await api('/api/marketing/sms/campaigns/' + id + '/send', { method: 'POST' });
-    toast('SMS campaign sent\!'); navigate('sms-marketing');
-}
-
-
-// ── Contacts Module ─────────────────────────────────────────────────────────
-
-async function renderContacts(el) {
-    const contacts = await api('/api/contacts');
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Contacts</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewContact()">+ New Contact</button></div></div>' +
-        '<div class="tabs">' +
-            '<div class="tab active" onclick="filterContactsTab(this,'all')">All</div>' +
-            '<div class="tab" onclick="filterContactsTab(this,'customer')">Customers</div>' +
-            '<div class="tab" onclick="filterContactsTab(this,'vendor')">Vendors</div>' +
-        '</div>' +
-        '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>City</th><th>Type</th>' +
-        '</tr></thead><tbody id="contacts-tbody">' +
-        contacts.map(c => '<tr class="contact-row" data-cust="' + c.is_customer + '" data-vend="' + c.is_vendor + '" onclick="showContactDetail(' + c.id + ')">' +
-            '<td><strong>' + escHtml(c.name) + '</strong></td>' +
-            '<td>' + escHtml(c.company || '') + '</td>' +
-            '<td>' + escHtml(c.email || '') + '</td>' +
-            '<td>' + escHtml(c.phone || '') + '</td>' +
-            '<td>' + escHtml(c.city || '') + '</td>' +
-            '<td>' + (c.is_customer ? '<span class="badge badge-confirmed">Customer</span> ' : '') + (c.is_vendor ? '<span class="badge badge-proposition">Vendor</span>' : '') + '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>';
-}
-
-function filterContactsTab(tab, type) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    document.querySelectorAll('.contact-row').forEach(r => {
-        if (type === 'all') r.style.display = '';
-        else if (type === 'customer') r.style.display = r.dataset.cust === 'True' ? '' : 'none';
-        else r.style.display = r.dataset.vend === 'True' ? '' : 'none';
+    // Monthly Profit Bar Chart
+    chartInstances.profit = new Chart(document.getElementById('chart-profit'), {
+        type: 'bar',
+        data: {
+            labels: months,
+            datasets: [{
+                label: 'Profit',
+                data: charts.monthly.map(m => m.profit),
+                backgroundColor: charts.monthly.map(m => m.profit >= 0 ? '#28a745' : '#dc3545'),
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: false } },
+        }
     });
 }
 
-async function showNewContact() {
-    openModal('New Contact',
-        '<form id="contact-form">' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>Name</label><input name="name" class="form-control" required></div>' +
-            '<div class="form-group"><label>Company</label><input name="company" class="form-control"></div>' +
-        '</div>' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>Email</label><input name="email" type="email" class="form-control"></div>' +
-            '<div class="form-group"><label>Phone</label><input name="phone" class="form-control"></div>' +
-        '</div>' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>Mobile</label><input name="mobile" class="form-control"></div>' +
-            '<div class="form-group"><label>City</label><input name="city" class="form-control"></div>' +
-        '</div>' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>State</label><input name="state" class="form-control"></div>' +
-            '<div class="form-group"><label>Country</label><input name="country" class="form-control" value="US"></div>' +
-        '</div>' +
-        '<div class="form-group"><label>Address</label><textarea name="address" class="form-control"></textarea></div>' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label><input type="checkbox" name="is_customer" checked> Customer</label></div>' +
-            '<div class="form-group"><label><input type="checkbox" name="is_vendor"> Vendor</label></div>' +
-        '</div>' +
-        '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control"></textarea></div>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="saveContact()">Create</button>'
-    );
+// ── Sales Page ──────────────────────────────────────────────────────────────
+
+async function loadSales() {
+    const content = document.getElementById('page-content');
+
+    let employeesHtml = '';
+    if (isOwner()) {
+        try {
+            const emps = await api('/api/users/employees');
+            employeesHtml = `
+                <div class="filter-group">
+                    <label>Employee</label>
+                    <select id="filter-sale-employee">
+                        <option value="">All Employees</option>
+                        ${emps.map(e => `<option value="${e.id}">${esc(e.full_name)}</option>`).join('')}
+                    </select>
+                </div>`;
+        } catch (e) {}
+    }
+
+    content.innerHTML = `
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label>From</label>
+                <input type="date" id="filter-sale-from" value="${monthStartStr()}">
+            </div>
+            <div class="filter-group">
+                <label>To</label>
+                <input type="date" id="filter-sale-to" value="${todayStr()}">
+            </div>
+            <div class="filter-group">
+                <label>Type</label>
+                <select id="filter-sale-type">
+                    <option value="">All Types</option>
+                    <option value="sofa_sale">Sofa Sale</option>
+                    <option value="repair">Repair</option>
+                    <option value="service">Service</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Payment</label>
+                <select id="filter-sale-payment">
+                    <option value="">All</option>
+                    <option value="cash">Cash</option>
+                    <option value="bank">Bank</option>
+                    <option value="transfer">Transfer</option>
+                </select>
+            </div>
+            ${employeesHtml}
+            <div class="filter-group">
+                <label>Search</label>
+                <input type="text" id="filter-sale-search" placeholder="Customer or description">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="fetchSales()">Filter</button>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3>Sales Records</h3>
+                <button class="btn btn-accent" onclick="openSaleForm()">+ New Sale</button>
+            </div>
+            <div id="sales-table-container">
+                <div class="loading-center"><div class="spinner"></div></div>
+            </div>
+        </div>`;
+
+    fetchSales();
 }
 
-async function saveContact() {
+async function fetchSales() {
+    const params = new URLSearchParams();
+    const from = document.getElementById('filter-sale-from')?.value;
+    const to = document.getElementById('filter-sale-to')?.value;
+    const type = document.getElementById('filter-sale-type')?.value;
+    const payment = document.getElementById('filter-sale-payment')?.value;
+    const emp = document.getElementById('filter-sale-employee')?.value;
+    const search = document.getElementById('filter-sale-search')?.value;
+
+    if (from) params.set('date_from', from);
+    if (to) params.set('date_to', to);
+    if (type) params.set('sale_type', type);
+    if (payment) params.set('payment_method', payment);
+    if (emp) params.set('employee_id', emp);
+    if (search) params.set('search', search);
+
     try {
-        const data = getFormData('contact-form');
-        await api('/api/contacts', { method: 'POST', body: data });
-        closeModal(); toast('Contact created'); navigate('contacts');
-    } catch (e) { toast(e.message, 'error'); }
+        const sales = await api(`/api/sales?${params}`);
+        renderSalesTable(sales);
+    } catch (err) {
+        document.getElementById('sales-table-container').innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
+    }
 }
 
-async function showContactDetail(id) {
-    const c = await api('/api/contacts/' + id);
-    openModal(c.name,
-        '<div class="detail-grid">' +
-            '<div><div class="detail-field"><div class="detail-label">Company</div><div class="detail-value">' + escHtml(c.company || 'N/A') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Email</div><div class="detail-value">' + escHtml(c.email || 'N/A') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Phone</div><div class="detail-value">' + escHtml(c.phone || 'N/A') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Mobile</div><div class="detail-value">' + escHtml(c.mobile || 'N/A') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">City</div><div class="detail-value">' + escHtml(c.city || '') + ', ' + escHtml(c.state || '') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Type</div><div class="detail-value">' +
-                (c.is_customer ? '<span class="badge badge-confirmed">Customer</span> ' : '') +
-                (c.is_vendor ? '<span class="badge badge-proposition">Vendor</span>' : '') + '</div></div></div>' +
-        '</div>' +
-        (c.address ? '<div class="detail-field mt-2"><div class="detail-label">Address</div><div class="detail-value">' + escHtml(c.address) + '</div></div>' : '') +
-        (c.notes ? '<div class="detail-field mt-2"><div class="detail-label">Notes</div><div class="detail-value">' + escHtml(c.notes) + '</div></div>' : ''),
-        '<button class="btn btn-danger btn-sm" onclick="deleteContact(' + id + ')">Delete</button>' +
-        '<button class="btn btn-outline" onclick="closeModal()">Close</button>'
-    );
+function renderSalesTable(sales) {
+    if (sales.length === 0) {
+        document.getElementById('sales-table-container').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">&#9650;</div>
+                <h3>No sales found</h3>
+                <p>Add your first sale or adjust filters</p>
+            </div>`;
+        return;
+    }
+
+    const total = sales.reduce((sum, s) => sum + parseFloat(s.amount), 0);
+
+    document.getElementById('sales-table-container').innerHTML = `
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Customer</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Amount (OMR)</th>
+                        <th>Payment</th>
+                        ${isOwner() ? '<th>Employee</th>' : ''}
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sales.map(s => `
+                        <tr>
+                            <td>${formatDate(s.date)}</td>
+                            <td>${esc(s.customer_name) || '<span style="color:var(--text-muted)">-</span>'}</td>
+                            <td>${saleTypeBadge(s.sale_type)}</td>
+                            <td>${esc(s.description) || ''}</td>
+                            <td class="amount-cell amount-positive">${formatOMR(s.amount)}</td>
+                            <td>${paymentBadge(s.payment_method)}</td>
+                            ${isOwner() ? `<td>${esc(s.employee_name) || ''}</td>` : ''}
+                            <td>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline" onclick="openSaleForm(${s.id})">Edit</button>
+                                    ${isOwner() ? `<button class="btn btn-sm btn-danger" onclick="deleteSale(${s.id})">Delete</button>` : ''}
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="${isOwner() ? 4 : 3}" style="text-align:right; font-weight:700">Total:</td>
+                        <td class="amount-cell amount-positive" style="font-weight:700">${formatOMR(total)}</td>
+                        <td colspan="${isOwner() ? 3 : 2}"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div style="margin-top:8px; font-size:13px; color:var(--text-muted)">${sales.length} record(s)</div>`;
 }
 
-async function deleteContact(id) {
-    if (\!confirm('Delete this contact?')) return;
+async function openSaleForm(saleId = null) {
+    let sale = null;
+    if (saleId) {
+        try { sale = await api(`/api/sales/${saleId}`); } catch (e) { toast(e.message, 'error'); return; }
+    }
+
+    const html = `
+        <form id="sale-form" onsubmit="return saveSale(event, ${saleId || 'null'})">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Date *</label>
+                    <input type="date" name="date" value="${sale ? sale.date : todayStr()}" required>
+                </div>
+                <div class="form-group">
+                    <label>Sale Type *</label>
+                    <select name="sale_type" required>
+                        <option value="sofa_sale" ${sale?.sale_type === 'sofa_sale' ? 'selected' : ''}>Sofa Sale</option>
+                        <option value="repair" ${sale?.sale_type === 'repair' ? 'selected' : ''}>Repair</option>
+                        <option value="service" ${sale?.sale_type === 'service' ? 'selected' : ''}>Service</option>
+                        <option value="other" ${sale?.sale_type === 'other' ? 'selected' : ''}>Other</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Customer Name (optional)</label>
+                <input type="text" name="customer_name" value="${esc(sale?.customer_name || '')}" placeholder="e.g. Mohammed Al-Balushi">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea name="description" placeholder="e.g. 3-seater sofa, beige fabric">${esc(sale?.description || '')}</textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Amount (OMR) *</label>
+                    <input type="number" name="amount" step="0.001" min="0.001" value="${sale ? sale.amount : ''}" required placeholder="0.000">
+                </div>
+                <div class="form-group">
+                    <label>Payment Method *</label>
+                    <select name="payment_method" required>
+                        <option value="cash" ${sale?.payment_method === 'cash' ? 'selected' : ''}>Cash</option>
+                        <option value="bank" ${sale?.payment_method === 'bank' ? 'selected' : ''}>Bank</option>
+                        <option value="transfer" ${sale?.payment_method === 'transfer' ? 'selected' : ''}>Transfer</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Notes (optional)</label>
+                <input type="text" name="note" value="${esc(sale?.note || '')}" placeholder="Any additional notes">
+            </div>
+            <div style="margin-top:20px; display:flex; gap:8px; justify-content:flex-end">
+                <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">${saleId ? 'Update Sale' : 'Add Sale'}</button>
+            </div>
+        </form>`;
+
+    openModal(saleId ? 'Edit Sale' : 'New Sale', html);
+}
+
+async function saveSale(e, saleId) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        date: form.date.value,
+        customer_name: form.customer_name.value,
+        sale_type: form.sale_type.value,
+        description: form.description.value,
+        amount: form.amount.value,
+        payment_method: form.payment_method.value,
+        note: form.note.value,
+    };
+
     try {
-        await api('/api/contacts/' + id, { method: 'DELETE' });
-        closeModal(); toast('Contact deleted'); navigate('contacts');
-    } catch (e) { toast(e.message, 'error'); }
+        if (saleId) {
+            await api(`/api/sales/${saleId}`, { method: 'PUT', body: data });
+            toast('Sale updated');
+        } else {
+            await api('/api/sales', { method: 'POST', body: data });
+            toast('Sale added');
+        }
+        closeModal();
+        fetchSales();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+    return false;
 }
 
-// ── Products Module ─────────────────────────────────────────────────────────
-
-async function renderProducts(el) {
-    const products = await api('/api/products');
-    const categories = ['All', 'Sofa', 'Table', 'Chair', 'Bed', 'Cabinet', 'Shelf', 'Desk', 'Outdoor', 'Accessory', 'Raw Material'];
-    el.innerHTML = '<div class="page-header"><h1 class="page-title">Products</h1>' +
-        '<div class="page-actions"><button class="btn btn-primary" onclick="showNewProduct()">+ New Product</button></div></div>' +
-        '<div class="tabs">' +
-        categories.map((c, i) => '<div class="tab' + (i === 0 ? ' active' : '') + '" onclick="filterProducts(this,'' + c + '')">'+c+'</div>').join('') +
-        '</div>' +
-        '<div class="card"><div class="table-wrapper"><table><thead><tr>' +
-            '<th>SKU</th><th>Name</th><th>Category</th><th>Material</th><th>Sale Price</th><th>Cost</th><th>Dimensions</th>' +
-        '</tr></thead><tbody id="products-tbody">' +
-        products.map(p => '<tr class="prod-row" data-cat="' + escHtml(p.category || '') + '" onclick="showProductDetail(' + p.id + ')">' +
-            '<td>' + escHtml(p.sku || '') + '</td>' +
-            '<td><strong>' + escHtml(p.name) + '</strong></td>' +
-            '<td>' + escHtml(p.category || '') + '</td>' +
-            '<td>' + escHtml(p.material || '') + '</td>' +
-            '<td>' + fmt(p.sale_price) + '</td>' +
-            '<td>' + fmt(p.cost_price) + '</td>' +
-            '<td>' + escHtml(p.dimensions || '') + '</td></tr>'
-        ).join('') +
-        '</tbody></table></div></div>';
-}
-
-function filterProducts(tab, cat) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    document.querySelectorAll('.prod-row').forEach(r => {
-        r.style.display = (cat === 'All' || r.dataset.cat === cat) ? '' : 'none';
-    });
-}
-
-async function showNewProduct() {
-    const categories = ['Sofa', 'Table', 'Chair', 'Bed', 'Cabinet', 'Shelf', 'Desk', 'Outdoor', 'Accessory', 'Raw Material'];
-    openModal('New Product',
-        '<form id="product-form">' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>Name</label><input name="name" class="form-control" required></div>' +
-            '<div class="form-group"><label>SKU</label><input name="sku" class="form-control" required></div>' +
-        '</div>' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>Category</label><select name="category" class="form-control">' + categories.map(c => '<option>' + c + '</option>').join('') + '</select></div>' +
-            '<div class="form-group"><label>Material</label><input name="material" class="form-control"></div>' +
-        '</div>' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>Sale Price</label><input name="sale_price" type="number" class="form-control" step="0.01" value="0"></div>' +
-            '<div class="form-group"><label>Cost Price</label><input name="cost_price" type="number" class="form-control" step="0.01" value="0"></div>' +
-        '</div>' +
-        '<div class="form-row">' +
-            '<div class="form-group"><label>Dimensions</label><input name="dimensions" class="form-control" placeholder="e.g. 120x80x75 cm"></div>' +
-            '<div class="form-group"><label>Color</label><input name="color" class="form-control"></div>' +
-        '</div>' +
-        '<div class="form-group"><label>Description</label><textarea name="description" class="form-control"></textarea></div>' +
-        '</form>',
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="saveProduct()">Create</button>'
-    );
-}
-
-async function saveProduct() {
+async function deleteSale(id) {
+    if (!confirm('Delete this sale record?')) return;
     try {
-        const data = getFormData('product-form');
-        await api('/api/products', { method: 'POST', body: data });
-        closeModal(); toast('Product created'); navigate('products');
-    } catch (e) { toast(e.message, 'error'); }
+        await api(`/api/sales/${id}`, { method: 'DELETE' });
+        toast('Sale deleted');
+        fetchSales();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
 }
 
-async function showProductDetail(id) {
-    const p = await api('/api/products/' + id);
-    const stock = await api('/api/products/' + id + '/stock');
-    openModal(p.name,
-        '<div class="detail-grid">' +
-            '<div><div class="detail-field"><div class="detail-label">SKU</div><div class="detail-value">' + escHtml(p.sku) + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Category</div><div class="detail-value">' + escHtml(p.category) + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Sale Price</div><div class="detail-value" style="font-size:18px;color:var(--primary);">' + fmt(p.sale_price) + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Cost Price</div><div class="detail-value">' + fmt(p.cost_price) + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Material</div><div class="detail-value">' + escHtml(p.material || 'N/A') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Dimensions</div><div class="detail-value">' + escHtml(p.dimensions || 'N/A') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Color</div><div class="detail-value">' + escHtml(p.color || 'N/A') + '</div></div></div>' +
-            '<div><div class="detail-field"><div class="detail-label">Stock On Hand</div><div class="detail-value" style="font-size:18px;font-weight:700;">' + stock.on_hand + '</div></div></div>' +
-        '</div>' +
-        (p.description ? '<div class="detail-field mt-4"><div class="detail-label">Description</div><div class="detail-value">' + escHtml(p.description) + '</div></div>' : ''),
-        '<button class="btn btn-danger btn-sm" onclick="deleteProduct(' + id + ')">Archive</button>' +
-        '<button class="btn btn-outline" onclick="closeModal()">Close</button>'
-    );
+// ── Expenses Page ───────────────────────────────────────────────────────────
+
+async function loadExpenses() {
+    const content = document.getElementById('page-content');
+    let categories = [];
+    try { categories = await api('/api/expenses/categories'); } catch (e) {}
+
+    let employeesHtml = '';
+    if (isOwner()) {
+        try {
+            const emps = await api('/api/users/employees');
+            employeesHtml = `
+                <div class="filter-group">
+                    <label>Employee</label>
+                    <select id="filter-exp-employee">
+                        <option value="">All Employees</option>
+                        ${emps.map(e => `<option value="${e.id}">${esc(e.full_name)}</option>`).join('')}
+                    </select>
+                </div>`;
+        } catch (e) {}
+    }
+
+    content.innerHTML = `
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label>From</label>
+                <input type="date" id="filter-exp-from" value="${monthStartStr()}">
+            </div>
+            <div class="filter-group">
+                <label>To</label>
+                <input type="date" id="filter-exp-to" value="${todayStr()}">
+            </div>
+            <div class="filter-group">
+                <label>Category</label>
+                <select id="filter-exp-category">
+                    <option value="">All Categories</option>
+                    ${categories.map(c => `<option value="${esc(c.value)}">${esc(c.label)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Payment</label>
+                <select id="filter-exp-payment">
+                    <option value="">All</option>
+                    <option value="cash">Cash</option>
+                    <option value="bank">Bank</option>
+                </select>
+            </div>
+            ${employeesHtml}
+            <div class="filter-group">
+                <label>Search</label>
+                <input type="text" id="filter-exp-search" placeholder="Search description">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="fetchExpenses()">Filter</button>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3>Expense Records</h3>
+                <button class="btn btn-accent" onclick="openExpenseForm()">+ New Expense</button>
+            </div>
+            <div id="expenses-table-container">
+                <div class="loading-center"><div class="spinner"></div></div>
+            </div>
+        </div>`;
+
+    // Store categories globally for the form
+    window._expenseCategories = categories;
+    fetchExpenses();
 }
 
-async function deleteProduct(id) {
-    if (\!confirm('Archive this product?')) return;
-    await api('/api/products/' + id, { method: 'DELETE' });
-    closeModal(); toast('Product archived'); navigate('products');
+async function fetchExpenses() {
+    const params = new URLSearchParams();
+    const from = document.getElementById('filter-exp-from')?.value;
+    const to = document.getElementById('filter-exp-to')?.value;
+    const cat = document.getElementById('filter-exp-category')?.value;
+    const payment = document.getElementById('filter-exp-payment')?.value;
+    const emp = document.getElementById('filter-exp-employee')?.value;
+    const search = document.getElementById('filter-exp-search')?.value;
+
+    if (from) params.set('date_from', from);
+    if (to) params.set('date_to', to);
+    if (cat) params.set('category', cat);
+    if (payment) params.set('payment_method', payment);
+    if (emp) params.set('employee_id', emp);
+    if (search) params.set('search', search);
+
+    try {
+        const expenses = await api(`/api/expenses?${params}`);
+        renderExpensesTable(expenses);
+    } catch (err) {
+        document.getElementById('expenses-table-container').innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
+    }
 }
 
-// ── Init ────────────────────────────────────────────────────────────────────
+function renderExpensesTable(expenses) {
+    if (expenses.length === 0) {
+        document.getElementById('expenses-table-container').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">&#9660;</div>
+                <h3>No expenses found</h3>
+                <p>Add your first expense or adjust filters</p>
+            </div>`;
+        return;
+    }
 
-document.addEventListener('DOMContentLoaded', () => {
-    navigate('dashboard');
-});
+    const total = expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
 
-document.getElementById('modal-overlay').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) closeModal();
-});
+    document.getElementById('expenses-table-container').innerHTML = `
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Amount (OMR)</th>
+                        <th>Payment</th>
+                        ${isOwner() ? '<th>Employee</th>' : ''}
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${expenses.map(e => `
+                        <tr>
+                            <td>${formatDate(e.date)}</td>
+                            <td><span class="badge badge-expense">${esc(e.category)}</span></td>
+                            <td>${esc(e.description) || ''}</td>
+                            <td class="amount-cell amount-negative">${formatOMR(e.amount)}</td>
+                            <td>${paymentBadge(e.payment_method)}</td>
+                            ${isOwner() ? `<td>${esc(e.employee_name) || ''}</td>` : ''}
+                            <td>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline" onclick="openExpenseForm(${e.id})">Edit</button>
+                                    ${isOwner() ? `<button class="btn btn-sm btn-danger" onclick="deleteExpense(${e.id})">Delete</button>` : ''}
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="${isOwner() ? 3 : 2}" style="text-align:right; font-weight:700">Total:</td>
+                        <td class="amount-cell amount-negative" style="font-weight:700">${formatOMR(total)}</td>
+                        <td colspan="${isOwner() ? 3 : 2}"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div style="margin-top:8px; font-size:13px; color:var(--text-muted)">${expenses.length} record(s)</div>`;
+}
+
+async function openExpenseForm(expenseId = null) {
+    let expense = null;
+    if (expenseId) {
+        try { expense = await api(`/api/expenses/${expenseId}`); } catch (e) { toast(e.message, 'error'); return; }
+    }
+
+    const cats = window._expenseCategories || [];
+
+    const html = `
+        <form id="expense-form" onsubmit="return saveExpense(event, ${expenseId || 'null'})">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Date *</label>
+                    <input type="date" name="date" value="${expense ? expense.date : todayStr()}" required>
+                </div>
+                <div class="form-group">
+                    <label>Category *</label>
+                    <select name="category" required>
+                        <option value="">Select category</option>
+                        ${cats.map(c => `<option value="${esc(c.value)}" ${expense?.category === c.value ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea name="description" placeholder="e.g. High density foam sheets for sofa repair">${esc(expense?.description || '')}</textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Amount (OMR) *</label>
+                    <input type="number" name="amount" step="0.001" min="0.001" value="${expense ? expense.amount : ''}" required placeholder="0.000">
+                </div>
+                <div class="form-group">
+                    <label>Payment Method *</label>
+                    <select name="payment_method" required>
+                        <option value="cash" ${expense?.payment_method === 'cash' ? 'selected' : ''}>Cash</option>
+                        <option value="bank" ${expense?.payment_method === 'bank' ? 'selected' : ''}>Bank</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Notes (optional)</label>
+                <input type="text" name="note" value="${esc(expense?.note || '')}" placeholder="Any additional notes">
+            </div>
+            <div style="margin-top:20px; display:flex; gap:8px; justify-content:flex-end">
+                <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">${expenseId ? 'Update Expense' : 'Add Expense'}</button>
+            </div>
+        </form>`;
+
+    openModal(expenseId ? 'Edit Expense' : 'New Expense', html);
+}
+
+async function saveExpense(e, expenseId) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        date: form.date.value,
+        category: form.category.value,
+        description: form.description.value,
+        amount: form.amount.value,
+        payment_method: form.payment_method.value,
+        note: form.note.value,
+    };
+
+    try {
+        if (expenseId) {
+            await api(`/api/expenses/${expenseId}`, { method: 'PUT', body: data });
+            toast('Expense updated');
+        } else {
+            await api('/api/expenses', { method: 'POST', body: data });
+            toast('Expense added');
+        }
+        closeModal();
+        fetchExpenses();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+    return false;
+}
+
+async function deleteExpense(id) {
+    if (!confirm('Delete this expense record?')) return;
+    try {
+        await api(`/api/expenses/${id}`, { method: 'DELETE' });
+        toast('Expense deleted');
+        fetchExpenses();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+// ── Reports Page ────────────────────────────────────────────────────────────
+
+async function loadReports() {
+    const content = document.getElementById('page-content');
+
+    content.innerHTML = `
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label>From</label>
+                <input type="date" id="report-from" value="${monthStartStr()}">
+            </div>
+            <div class="filter-group">
+                <label>To</label>
+                <input type="date" id="report-to" value="${todayStr()}">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="fetchReport()">Generate Report</button>
+            <div style="margin-left:auto" class="btn-group">
+                <button class="btn btn-sm btn-success" onclick="exportExcel('profit-loss')">Export P&L</button>
+                <button class="btn btn-sm btn-success" onclick="exportExcel('sales')">Export Sales</button>
+                <button class="btn btn-sm btn-success" onclick="exportExcel('expenses')">Export Expenses</button>
+            </div>
+        </div>
+        <div id="report-content">
+            <div class="loading-center"><div class="spinner"></div></div>
+        </div>`;
+
+    fetchReport();
+}
+
+async function fetchReport() {
+    const from = document.getElementById('report-from')?.value;
+    const to = document.getElementById('report-to')?.value;
+    const params = new URLSearchParams();
+    if (from) params.set('date_from', from);
+    if (to) params.set('date_to', to);
+
+    try {
+        const [pl, cashflow, empReport] = await Promise.all([
+            api(`/api/reports/profit-loss?${params}`),
+            api(`/api/reports/cash-flow?${params}`),
+            isOwner() ? api(`/api/reports/employee-activity?${params}`).catch(() => null) : Promise.resolve(null),
+        ]);
+        renderReport(pl, cashflow, empReport);
+    } catch (err) {
+        document.getElementById('report-content').innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
+    }
+}
+
+function renderReport(pl, cashflow, empReport) {
+    const profitClass = pl.net_profit >= 0 ? 'amount-positive' : 'amount-negative';
+
+    let html = `
+        <div class="report-summary">
+            <div class="report-stat">
+                <div class="stat-value" style="color:var(--accent)">${formatOMR(pl.total_sales)}</div>
+                <div class="stat-label">Total Sales</div>
+            </div>
+            <div class="report-stat">
+                <div class="stat-value" style="color:var(--danger)">${formatOMR(pl.total_expenses)}</div>
+                <div class="stat-label">Total Expenses</div>
+            </div>
+            <div class="report-stat">
+                <div class="stat-value ${profitClass}">${formatOMR(pl.net_profit)}</div>
+                <div class="stat-label">Net Profit</div>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="card">
+                <div class="card-header"><h3>Sales by Type</h3></div>
+                ${pl.sales_by_type.length === 0 ? '<p style="color:var(--text-muted)">No sales in period</p>' : `
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Type</th><th>Count</th><th>Amount (OMR)</th></tr></thead>
+                        <tbody>
+                            ${pl.sales_by_type.map(s => `
+                                <tr>
+                                    <td>${saleTypeBadge(s.type)}</td>
+                                    <td>${s.count}</td>
+                                    <td class="amount-cell">${formatOMR(s.amount)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>`}
+            </div>
+            <div class="card">
+                <div class="card-header"><h3>Expenses by Category</h3></div>
+                ${pl.expenses_by_category.length === 0 ? '<p style="color:var(--text-muted)">No expenses in period</p>' : `
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Category</th><th>Count</th><th>Amount (OMR)</th></tr></thead>
+                        <tbody>
+                            ${pl.expenses_by_category.map(e => `
+                                <tr>
+                                    <td>${esc(e.category)}</td>
+                                    <td>${e.count}</td>
+                                    <td class="amount-cell">${formatOMR(e.amount)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>`}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h3>Cash Flow by Payment Method</h3></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px">
+                <div>
+                    <h4 style="font-size:14px; margin-bottom:8px; color:var(--accent)">Income</h4>
+                    ${cashflow.income_by_method.length === 0 ? '<p style="color:var(--text-muted)">No data</p>' :
+                      cashflow.income_by_method.map(m => `
+                        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border)">
+                            <span>${paymentBadge(m.method)}</span>
+                            <span class="amount-cell">${formatOMR(m.amount)}</span>
+                        </div>
+                      `).join('')}
+                </div>
+                <div>
+                    <h4 style="font-size:14px; margin-bottom:8px; color:var(--danger)">Expenses</h4>
+                    ${cashflow.expenses_by_method.length === 0 ? '<p style="color:var(--text-muted)">No data</p>' :
+                      cashflow.expenses_by_method.map(m => `
+                        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border)">
+                            <span>${paymentBadge(m.method)}</span>
+                            <span class="amount-cell">${formatOMR(m.amount)}</span>
+                        </div>
+                      `).join('')}
+                </div>
+            </div>
+        </div>`;
+
+    // Employee activity report (owner only)
+    if (empReport && empReport.employees) {
+        html += `
+        <div class="card">
+            <div class="card-header"><h3>Employee Activity</h3></div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Role</th>
+                            <th>Sales Count</th>
+                            <th>Sales Total (OMR)</th>
+                            <th>Expense Count</th>
+                            <th>Expense Total (OMR)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${empReport.employees.map(e => `
+                            <tr>
+                                <td>${esc(e.employee_name)}</td>
+                                <td><span class="badge badge-${e.role}">${e.role}</span></td>
+                                <td>${e.sales_count}</td>
+                                <td class="amount-cell">${formatOMR(e.sales_total)}</td>
+                                <td>${e.expenses_count}</td>
+                                <td class="amount-cell">${formatOMR(e.expenses_total)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    document.getElementById('report-content').innerHTML = html;
+}
+
+function exportExcel(reportType) {
+    const from = document.getElementById('report-from')?.value || monthStartStr();
+    const to = document.getElementById('report-to')?.value || todayStr();
+    window.open(`/api/reports/export/excel?report_type=${reportType}&date_from=${from}&date_to=${to}`, '_blank');
+}
+
+// ── Audit Log Page ──────────────────────────────────────────────────────────
+
+async function loadAudit() {
+    const content = document.getElementById('page-content');
+
+    try {
+        const logs = await api('/api/audit?limit=200');
+        if (logs.length === 0) {
+            content.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">&#9881;</div>
+                    <h3>No audit logs yet</h3>
+                    <p>Changes to sales and expenses will appear here</p>
+                </div>`;
+            return;
+        }
+
+        content.innerHTML = `
+            <div class="card">
+                <div class="card-header"><h3>Change History</h3></div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date/Time</th>
+                                <th>User</th>
+                                <th>Table</th>
+                                <th>Record ID</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${logs.map(log => `
+                                <tr>
+                                    <td style="white-space:nowrap">${formatDateTime(log.created_at)}</td>
+                                    <td>${esc(log.user_name)}</td>
+                                    <td>${esc(log.table_name)}</td>
+                                    <td>#${log.record_id}</td>
+                                    <td><span class="audit-action ${log.action}">${log.action}</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline" onclick="showAuditDetail(${log.id}, '${esc(log.old_values || '').replace(/'/g, "\\'")}', '${esc(log.new_values || '').replace(/'/g, "\\'")}')">View</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+    } catch (err) {
+        content.innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
+    }
+}
+
+function showAuditDetail(id, oldVal, newVal) {
+    let oldObj = null, newObj = null;
+    try { oldObj = oldVal ? JSON.parse(oldVal) : null; } catch (e) {}
+    try { newObj = newVal ? JSON.parse(newVal) : null; } catch (e) {}
+
+    let html = '';
+    if (oldObj) {
+        html += '<h4 style="margin-bottom:8px">Previous Values:</h4><pre style="background:var(--bg); padding:12px; border-radius:4px; font-size:12px; overflow-x:auto; margin-bottom:16px">' + esc(JSON.stringify(oldObj, null, 2)) + '</pre>';
+    }
+    if (newObj) {
+        html += '<h4 style="margin-bottom:8px">New Values:</h4><pre style="background:var(--bg); padding:12px; border-radius:4px; font-size:12px; overflow-x:auto">' + esc(JSON.stringify(newObj, null, 2)) + '</pre>';
+    }
+    if (!html) html = '<p>No details available</p>';
+
+    openModal(`Audit Log #${id}`, html);
+}
+
+// ── Users Management Page ───────────────────────────────────────────────────
+
+async function loadUsers() {
+    const content = document.getElementById('page-content');
+
+    try {
+        const users = await api('/api/users');
+
+        content.innerHTML = `
+            <div class="card">
+                <div class="card-header">
+                    <h3>Manage Users</h3>
+                    <button class="btn btn-accent" onclick="openUserForm()">+ Add User</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${users.map(u => `
+                                <tr style="${!u.is_active ? 'opacity:0.5' : ''}">
+                                    <td>${esc(u.full_name)}</td>
+                                    <td><code>${esc(u.username)}</code></td>
+                                    <td><span class="badge badge-${u.role}">${u.role}</span></td>
+                                    <td>${u.is_active ? '<span style="color:var(--success)">Active</span>' : '<span style="color:var(--danger)">Inactive</span>'}</td>
+                                    <td>${formatDateTime(u.created_at)}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <button class="btn btn-sm btn-outline" onclick="openUserForm(${u.id})">Edit</button>
+                                            ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deactivateUser(${u.id}, '${esc(u.full_name)}')">${u.is_active ? 'Deactivate' : 'Already Inactive'}</button>` : ''}
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+    } catch (err) {
+        content.innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
+    }
+}
+
+async function openUserForm(userId = null) {
+    let user = null;
+    if (userId) {
+        try {
+            const users = await api('/api/users');
+            user = users.find(u => u.id === userId);
+        } catch (e) { toast(e.message, 'error'); return; }
+    }
+
+    const html = `
+        <form id="user-form" onsubmit="return saveUser(event, ${userId || 'null'})">
+            <div class="form-group">
+                <label>Full Name *</label>
+                <input type="text" name="full_name" value="${esc(user?.full_name || '')}" required placeholder="e.g. Ahmed Al-Rashdi">
+            </div>
+            <div class="form-group">
+                <label>Username *</label>
+                <input type="text" name="username" value="${esc(user?.username || '')}" ${userId ? 'disabled' : 'required'} placeholder="e.g. ahmed">
+            </div>
+            <div class="form-group">
+                <label>${userId ? 'New Password (leave empty to keep current)' : 'Password *'}</label>
+                <input type="password" name="password" ${userId ? '' : 'required'} minlength="4" placeholder="Min 4 characters">
+            </div>
+            <div class="form-group">
+                <label>Role *</label>
+                <select name="role" required>
+                    <option value="employee" ${user?.role === 'employee' ? 'selected' : ''}>Employee</option>
+                    <option value="owner" ${user?.role === 'owner' ? 'selected' : ''}>Owner</option>
+                </select>
+            </div>
+            ${userId ? `
+            <div class="form-group">
+                <label>Status</label>
+                <select name="is_active">
+                    <option value="true" ${user?.is_active ? 'selected' : ''}>Active</option>
+                    <option value="false" ${!user?.is_active ? 'selected' : ''}>Inactive</option>
+                </select>
+            </div>` : ''}
+            <div style="margin-top:20px; display:flex; gap:8px; justify-content:flex-end">
+                <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">${userId ? 'Update User' : 'Create User'}</button>
+            </div>
+        </form>`;
+
+    openModal(userId ? 'Edit User' : 'New User', html);
+}
+
+async function saveUser(e, userId) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        full_name: form.full_name.value,
+        role: form.role.value,
+    };
+    if (!userId) data.username = form.username.value;
+    if (form.password.value) data.password = form.password.value;
+    if (userId && form.is_active) data.is_active = form.is_active.value === 'true';
+
+    try {
+        if (userId) {
+            await api(`/api/users/${userId}`, { method: 'PUT', body: data });
+            toast('User updated');
+        } else {
+            await api('/api/users', { method: 'POST', body: data });
+            toast('User created');
+        }
+        closeModal();
+        loadUsers();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+    return false;
+}
+
+async function deactivateUser(id, name) {
+    if (!confirm(`Deactivate user "${name}"?`)) return;
+    try {
+        await api(`/api/users/${id}`, { method: 'DELETE' });
+        toast(`User ${name} deactivated`);
+        loadUsers();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+async function init() {
+    try {
+        const user = await api('/api/auth/me');
+        currentUser = user;
+        showApp();
+    } catch (e) {
+        showLogin();
+    }
+}
+
+init();
