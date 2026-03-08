@@ -7,6 +7,7 @@ import os
 
 from app.database import engine, Base
 from app.routers import auth, daily_sales, daily_expenses, dashboard, reports, users, audit
+from app.routers import inventory_router
 from app.seed import seed
 
 # Base directory (project root)
@@ -32,6 +33,7 @@ app.include_router(daily_expenses.router)
 app.include_router(reports.router)
 app.include_router(users.router)
 app.include_router(audit.router)
+app.include_router(inventory_router.router)
 
 
 @app.get("/", response_class=HTMLResponse)

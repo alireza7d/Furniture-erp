@@ -168,6 +168,7 @@ function navigate(page) {
         dashboard: 'Dashboard',
         sales: 'Sales',
         expenses: 'Expenses',
+        inventory: 'Inventory',
         reports: 'Reports',
         audit: 'Audit Log',
         users: 'User Management',
@@ -186,6 +187,7 @@ function navigate(page) {
         dashboard: loadDashboard,
         sales: loadSales,
         expenses: loadExpenses,
+        inventory: loadInventory,
         reports: loadReports,
         audit: loadAudit,
         users: loadUsers,
@@ -900,6 +902,285 @@ async function deleteExpense(id) {
         await api(`/api/expenses/${id}`, { method: 'DELETE' });
         toast('Expense deleted');
         fetchExpenses();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+// ── Inventory Page ──────────────────────────────────────────────────────
+
+async function loadInventory() {
+    const content = document.getElementById('page-content');
+
+    let categories = [];
+    try { categories = await api('/api/inventory/categories'); } catch (e) {}
+    window._invCategories = categories;
+
+    let summary = {};
+    try { summary = await api('/api/inventory/summary'); } catch (e) {}
+
+    content.innerHTML = `
+        <div class="kpi-grid">
+            <div class="kpi-card info">
+                <div class="kpi-label">Total Items</div>
+                <div class="kpi-value">${summary.total_items || 0}</div>
+            </div>
+            <div class="kpi-card sales">
+                <div class="kpi-label">Available</div>
+                <div class="kpi-value">${summary.available || 0}</div>
+            </div>
+            <div class="kpi-card profit">
+                <div class="kpi-label">Sold</div>
+                <div class="kpi-value">${summary.sold || 0}</div>
+            </div>
+            <div class="kpi-card expenses">
+                <div class="kpi-label">Stock Value</div>
+                <div class="kpi-value">${formatOMR(summary.total_stock_value || 0)}</div>
+            </div>
+        </div>
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label>Category</label>
+                <select id="filter-inv-category">
+                    <option value="">All Categories</option>
+                    ${categories.map(c => '<option value="' + esc(c.value) + '">' + esc(c.label) + '</option>').join('')}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Status</label>
+                <select id="filter-inv-status">
+                    <option value="">All Statuses</option>
+                    <option value="available">Available</option>
+                    <option value="sold">Sold</option>
+                    <option value="reserved">Reserved</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Location</label>
+                <select id="filter-inv-location">
+                    <option value="">All Locations</option>
+                    <option value="shop">Shop</option>
+                    <option value="workshop">Workshop</option>
+                    <option value="warehouse">Warehouse</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Search</label>
+                <input type="text" id="filter-inv-search" placeholder="Name or description">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="fetchInventory()">Filter</button>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3>Inventory Items</h3>
+                <button class="btn btn-accent" onclick="openInventoryForm()">+ Add Item</button>
+            </div>
+            <div id="inventory-table-container">
+                <div class="loading-center"><div class="spinner"></div></div>
+            </div>
+        </div>`;
+
+    fetchInventory();
+}
+
+async function fetchInventory() {
+    const params = new URLSearchParams();
+    const cat = document.getElementById('filter-inv-category')?.value;
+    const status = document.getElementById('filter-inv-status')?.value;
+    const loc = document.getElementById('filter-inv-location')?.value;
+    const search = document.getElementById('filter-inv-search')?.value;
+
+    if (cat) params.set('category', cat);
+    if (status) params.set('status', status);
+    if (loc) params.set('location', loc);
+    if (search) params.set('search', search);
+
+    try {
+        const items = await api('/api/inventory?' + params);
+        renderInventoryTable(items);
+    } catch (err) {
+        document.getElementById('inventory-table-container').innerHTML = '<div class="error-msg">' + esc(err.message) + '</div>';
+    }
+}
+
+function statusBadge(status) {
+    const colors = { available: 'badge-cash', sold: 'badge-expense', reserved: 'badge-transfer' };
+    return '<span class="badge ' + (colors[status] || '') + '">' + (status || '') + '</span>';
+}
+
+function categoryBadge(cat) {
+    return '<span class="badge badge-sofa_sale">' + (cat || '') + '</span>';
+}
+
+function renderInventoryTable(items) {
+    if (items.length === 0) {
+        document.getElementById('inventory-table-container').innerHTML = '\
+            <div class="empty-state">\
+                <div class="empty-state-icon">&#9638;</div>\
+                <h3>No items found</h3>\
+                <p>Add your first inventory item or adjust filters</p>\
+            </div>';
+        return;
+    }
+
+    const totalValue = items.reduce(function(sum, i) {
+        return sum + (i.status === 'available' ? parseFloat(i.selling_price) * (i.quantity || 1) : 0);
+    }, 0);
+
+    document.getElementById('inventory-table-container').innerHTML = '\
+        <div class="table-container">\
+            <table>\
+                <thead>\
+                    <tr>\
+                        <th>Name</th>\
+                        <th>Category</th>\
+                        <th>Price (OMR)</th>\
+                        <th>Qty</th>\
+                        <th>Status</th>\
+                        <th>Location</th>\
+                        <th>Actions</th>\
+                    </tr>\
+                </thead>\
+                <tbody>' +
+                    items.map(function(i) { return '\
+                        <tr>\
+                            <td><strong>' + esc(i.name) + '</strong>' + (i.description ? '<br><small style="color:var(--text-muted)">' + esc(i.description) + '</small>' : '') + '</td>\
+                            <td>' + categoryBadge(i.category) + '</td>\
+                            <td class="amount-cell">' + formatOMR(i.selling_price) + (i.cost_price ? '<br><small style="color:var(--text-muted)">Cost: ' + formatOMR(i.cost_price) + '</small>' : '') + '</td>\
+                            <td>' + (i.quantity || 1) + '</td>\
+                            <td>' + statusBadge(i.status) + '</td>\
+                            <td>' + esc(i.location || '-') + '</td>\
+                            <td>\
+                                <div class="btn-group">\
+                                    <button class="btn btn-sm btn-outline" onclick="openInventoryForm(' + i.id + ')">Edit</button>' +
+                                    (isOwner() ? '<button class="btn btn-sm btn-danger" onclick="deleteInventoryItem(' + i.id + ')">Delete</button>' : '') + '\
+                                </div>\
+                            </td>\
+                        </tr>';
+                    }).join('') + '\
+                </tbody>\
+                <tfoot>\
+                    <tr>\
+                        <td colspan="2" style="text-align:right; font-weight:700">Available Stock Value:</td>\
+                        <td class="amount-cell" style="font-weight:700">' + formatOMR(totalValue) + '</td>\
+                        <td colspan="4"></td>\
+                    </tr>\
+                </tfoot>\
+            </table>\
+        </div>\
+        <div style="margin-top:8px; font-size:13px; color:var(--text-muted)">' + items.length + ' item(s)</div>';
+}
+
+async function openInventoryForm(itemId) {
+    if (itemId === undefined) itemId = null;
+    var item = null;
+    if (itemId) {
+        try { item = await api('/api/inventory/' + itemId); } catch (e) { toast(e.message, 'error'); return; }
+    }
+
+    var cats = window._invCategories || [];
+
+    var html = '\
+        <form id="inventory-form" onsubmit="return saveInventoryItem(event, ' + (itemId || 'null') + ')">\
+            <div class="form-group">\
+                <label>Item Name *</label>\
+                <input type="text" name="name" value="' + esc(item ? item.name : '') + '" required placeholder="e.g. Picas Sofa">\
+            </div>\
+            <div class="form-row">\
+                <div class="form-group">\
+                    <label>Category *</label>\
+                    <select name="category" required>' +
+                        cats.map(function(c) { return '<option value="' + esc(c.value) + '"' + (item && item.category === c.value ? ' selected' : '') + '>' + esc(c.label) + '</option>'; }).join('') + '\
+                    </select>\
+                </div>\
+                <div class="form-group">\
+                    <label>Status</label>\
+                    <select name="status">\
+                        <option value="available"' + (item && item.status === 'available' ? ' selected' : !item ? ' selected' : '') + '>Available</option>\
+                        <option value="sold"' + (item && item.status === 'sold' ? ' selected' : '') + '>Sold</option>\
+                        <option value="reserved"' + (item && item.status === 'reserved' ? ' selected' : '') + '>Reserved</option>\
+                    </select>\
+                </div>\
+            </div>\
+            <div class="form-group">\
+                <label>Description</label>\
+                <textarea name="description" placeholder="e.g. 3-seater, beige fabric, modern design">' + esc(item ? item.description || '' : '') + '</textarea>\
+            </div>\
+            <div class="form-row">\
+                <div class="form-group">\
+                    <label>Selling Price (OMR) *</label>\
+                    <input type="number" name="selling_price" step="0.001" min="0" value="' + (item ? item.selling_price : '') + '" required placeholder="0.000">\
+                </div>\
+                <div class="form-group">\
+                    <label>Cost Price (OMR)</label>\
+                    <input type="number" name="cost_price" step="0.001" min="0" value="' + (item && item.cost_price ? item.cost_price : '') + '" placeholder="Optional">\
+                </div>\
+            </div>\
+            <div class="form-row">\
+                <div class="form-group">\
+                    <label>Quantity</label>\
+                    <input type="number" name="quantity" min="1" value="' + (item ? item.quantity : 1) + '">\
+                </div>\
+                <div class="form-group">\
+                    <label>Location</label>\
+                    <select name="location">\
+                        <option value="">-- Select --</option>\
+                        <option value="shop"' + (item && item.location === 'shop' ? ' selected' : '') + '>Shop</option>\
+                        <option value="workshop"' + (item && item.location === 'workshop' ? ' selected' : '') + '>Workshop</option>\
+                        <option value="warehouse"' + (item && item.location === 'warehouse' ? ' selected' : '') + '>Warehouse</option>\
+                    </select>\
+                </div>\
+            </div>\
+            <div class="form-group">\
+                <label>Notes (optional)</label>\
+                <input type="text" name="note" value="' + esc(item ? item.note || '' : '') + '" placeholder="Any additional notes">\
+            </div>\
+            <div style="margin-top:20px; display:flex; gap:8px; justify-content:flex-end">\
+                <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>\
+                <button type="submit" class="btn btn-primary">' + (itemId ? 'Update Item' : 'Add Item') + '</button>\
+            </div>\
+        </form>';
+
+    openModal(itemId ? 'Edit Item' : 'New Inventory Item', html);
+}
+
+async function saveInventoryItem(e, itemId) {
+    e.preventDefault();
+    var form = e.target;
+    var data = {
+        name: form.name.value,
+        category: form.category.value,
+        description: form.description.value,
+        selling_price: form.selling_price.value,
+        cost_price: form.cost_price.value || null,
+        quantity: form.quantity.value,
+        status: form.status.value,
+        location: form.location.value || null,
+        note: form.note.value,
+    };
+
+    try {
+        if (itemId) {
+            await api('/api/inventory/' + itemId, { method: 'PUT', body: data });
+            toast('Item updated');
+        } else {
+            await api('/api/inventory', { method: 'POST', body: data });
+            toast('Item added');
+        }
+        closeModal();
+        loadInventory();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+    return false;
+}
+
+async function deleteInventoryItem(id) {
+    if (!confirm('Delete this inventory item?')) return;
+    try {
+        await api('/api/inventory/' + id, { method: 'DELETE' });
+        toast('Item deleted');
+        loadInventory();
     } catch (err) {
         toast(err.message, 'error');
     }

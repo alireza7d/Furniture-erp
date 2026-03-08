@@ -145,6 +145,30 @@ class MoneySummary(Base):
     creator = relationship("User", foreign_keys=[created_by])
 
 
+# ── Inventory ─────────────────────────────────────────────────────────────
+
+class InventoryItem(Base):
+    __tablename__ = "inventory_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False)
+    category = Column(String(100), default="sofa")  # sofa, chair, table, bed, other
+    description = Column(Text)
+    selling_price = Column(Numeric(12, 3), nullable=False)  # OMR
+    cost_price = Column(Numeric(12, 3))  # OMR (optional)
+    quantity = Column(Integer, default=1)
+    status = Column(String(20), default="available")  # available, sold, reserved
+    location = Column(String(200))  # shop, workshop, warehouse
+    note = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id"))
+    updated_by = Column(Integer, ForeignKey("users.id"))
+
+    creator = relationship("User", foreign_keys=[created_by])
+    updater = relationship("User", foreign_keys=[updated_by])
+
+
 # ── Audit Log ──────────────────────────────────────────────────────────────────
 
 class AuditLog(Base):

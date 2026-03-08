@@ -1,5 +1,5 @@
 from app.database import SessionLocal
-from app.models import User, DailySale, DailyExpense, MoneySummary
+from app.models import User, DailySale, DailyExpense, MoneySummary, InventoryItem
 from datetime import date
 from decimal import Decimal
 
@@ -221,6 +221,32 @@ def seed():
             )
             db.add(summary)
 
+        # ── Inventory Data ───────────────────────────────────────────────────
+        inventory_data = [
+            {
+                "name": "Picas",
+                "category": "sofa",
+                "description": "Picas sofa - comfortable modern design",
+                "selling_price": Decimal("450.000"),
+                "quantity": 1,
+                "status": "available",
+                "location": "shop",
+            },
+        ]
+
+        for inv in inventory_data:
+            item = InventoryItem(
+                name=inv["name"],
+                category=inv["category"],
+                description=inv["description"],
+                selling_price=inv["selling_price"],
+                quantity=inv["quantity"],
+                status=inv["status"],
+                location=inv.get("location"),
+                created_by=owner.id,
+            )
+            db.add(item)
+
         db.commit()
         print("Database seeded with real business data!")
         print("  Sales: 7 records, total 2,380.000 OMR")
@@ -283,6 +309,23 @@ def seed():
             mohammad_user.role = "owner"
             changed = True
             print("  Updated Mohammad to owner role")
+
+        # Seed Picas sofa if inventory is empty
+        if db2.query(InventoryItem).count() == 0:
+            admin = db2.query(User).filter(User.username == "admin").first()
+            picas = InventoryItem(
+                name="Picas",
+                category="sofa",
+                description="Picas sofa - comfortable modern design",
+                selling_price=Decimal("450.000"),
+                quantity=1,
+                status="available",
+                location="shop",
+                created_by=admin.id if admin else None,
+            )
+            db2.add(picas)
+            changed = True
+            print("  Added inventory: Picas sofa (450 OMR)")
 
         if changed:
             db2.commit()
