@@ -127,6 +127,24 @@ class DailyExpense(Base):
     updater = relationship("User", foreign_keys=[updated_by])
 
 
+# ── Money Summary ─────────────────────────────────────────────────────────────
+
+class MoneySummary(Base):
+    __tablename__ = "money_summary"
+
+    id = Column(Integer, primary_key=True, index=True)
+    period = Column(String(100), nullable=False)  # e.g. "10 days Jan + Feb 2026"
+    description = Column(Text, nullable=False)
+    amount = Column(Numeric(12, 3), nullable=False)  # OMR 3 decimal places
+    entry_type = Column(String(50), nullable=False)  # bank_balance, cash, received, etc.
+    note = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id"))
+
+    creator = relationship("User", foreign_keys=[created_by])
+
+
 # ── Audit Log ──────────────────────────────────────────────────────────────────
 
 class AuditLog(Base):

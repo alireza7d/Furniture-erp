@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from app.database import get_db
-from app.models import DailySale, DailyExpense, User
+from app.models import DailySale, DailyExpense, User, MoneySummary
 from app.routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
@@ -220,4 +220,46 @@ def get_chart_data(
         "expense_by_category": expense_by_category,
         "daily_cash_flow": daily_flow,
         "top_expense_categories": top_expense_categories,
+    }
+
+
+@router.get("/money-summary")
+def get_money_summary(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get money summary (bank balance, cash, received amounts)."""
+    if current_user.role != "owner":
+        return {"entries": [], "totals": {}}
+
+    entries = db.query(MoneySummary).order_by(MoneySummary.id).all()
+
+    result = []
+    total = Decimal("0")
+    for e in entries:
+        result.append({
+            "id": e.id,
+            "period": e.period,
+            "description": e.description,
+            "amount": str(e.amount),
+            "entry_type": e.entry_type,
+        })
+        total += e.amount
+
+    # Calculate total from sales and expenses
+    total_sales = to_float(
+        db.query(func.sum(DailySale.amount)).scalar()
+    )
+    total_expenses = to_float(
+        db.query(func.sum(DailyExpense.amount)).scalar()
+    )
+
+    return {
+        "entries": result,
+        "totals": {
+            "total_entries": str(total),
+            "total_sales": round(total_sales, 3),
+            "total_expenses": round(total_expenses, 3),
+            "net_profit": round(total_sales - total_expenses, 3),
+        },
     }

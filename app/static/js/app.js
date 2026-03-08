@@ -218,17 +218,21 @@ function closeModal(e) {
 
 async function loadDashboard() {
     try {
-        const [data, charts] = await Promise.all([
+        const requests = [
             api('/api/dashboard'),
             api('/api/dashboard/charts'),
-        ]);
-        renderDashboard(data, charts);
+        ];
+        if (isOwner()) {
+            requests.push(api('/api/dashboard/money-summary'));
+        }
+        const [data, charts, moneySummary] = await Promise.all(requests);
+        renderDashboard(data, charts, moneySummary);
     } catch (err) {
         document.getElementById('page-content').innerHTML = `<div class="error-msg">${esc(err.message)}</div>`;
     }
 }
 
-function renderDashboard(data, charts) {
+function renderDashboard(data, charts, moneySummary) {
     const profitClass = v => v >= 0 ? 'positive' : 'negative';
     const profitSign = v => v >= 0 ? '+' : '';
 
@@ -259,6 +263,40 @@ function renderDashboard(data, charts) {
             <div class="kpi-value ${profitClass(data.month.profit)}">${profitSign(data.month.profit)}${formatOMR(data.month.profit)}</div>
         </div>
     </div>
+
+    ${moneySummary && moneySummary.entries && moneySummary.entries.length > 0 ? `
+    <div class="card" style="margin-bottom:1.5rem;">
+        <div class="card-header"><h3>Money Summary</h3></div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead><tr><th>Period</th><th>Description</th><th>Type</th><th style="text-align:right">Amount</th></tr></thead>
+                <tbody>
+                    ${moneySummary.entries.map(e => `
+                        <tr>
+                            <td>${esc(e.period)}</td>
+                            <td>${esc(e.description)}</td>
+                            <td><span class="badge badge-${e.entry_type === 'bank_balance' ? 'bank' : e.entry_type === 'cash' ? 'cash' : 'transfer'}">${esc(e.entry_type)}</span></td>
+                            <td style="text-align:right;font-weight:600">${formatOMR(e.amount)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        <div class="kpi-grid" style="margin-top:1rem;padding:0 1rem 1rem;">
+            <div class="kpi-card sales">
+                <div class="kpi-label">Total Sales</div>
+                <div class="kpi-value">${formatOMR(moneySummary.totals.total_sales)}</div>
+            </div>
+            <div class="kpi-card expenses">
+                <div class="kpi-label">Total Expenses</div>
+                <div class="kpi-value">${formatOMR(moneySummary.totals.total_expenses)}</div>
+            </div>
+            <div class="kpi-card profit">
+                <div class="kpi-label">Net Profit</div>
+                <div class="kpi-value ${moneySummary.totals.net_profit >= 0 ? 'positive' : 'negative'}">${moneySummary.totals.net_profit >= 0 ? '+' : ''}${formatOMR(moneySummary.totals.net_profit)}</div>
+            </div>
+        </div>
+    </div>` : ''}
 
     <div class="chart-grid">
         <div class="chart-card">
