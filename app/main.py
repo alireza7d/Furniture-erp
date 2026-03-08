@@ -2,11 +2,15 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
+from pathlib import Path
 import os
 
 from app.database import engine, Base
 from app.routers import auth, daily_sales, daily_expenses, dashboard, reports, users, audit
 from app.seed import seed
+
+# Base directory (project root)
+BASE_DIR = Path(__file__).resolve().parent
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -14,11 +18,11 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="FurnitureERP - Sales Tracker", version="2.0.0")
 
 # Ensure upload directories exist
-os.makedirs("app/static/uploads/receipts", exist_ok=True)
+os.makedirs(BASE_DIR / "static" / "uploads" / "receipts", exist_ok=True)
 
 # Static files & templates
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-templates = Jinja2Templates(directory="app/templates")
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 # Register routers
 app.include_router(auth.router)
