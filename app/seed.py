@@ -21,29 +21,21 @@ def seed():
         db.add(owner)
 
         # Create employees
-        emp1 = User(
-            username="ahmed",
-            full_name="Ahmed Al-Rashdi",
+        reza = User(
+            username="reza",
+            full_name="Reza",
             role="employee",
         )
-        emp1.set_password("ahmed123")
-        db.add(emp1)
+        reza.set_password("reza123")
+        db.add(reza)
 
-        emp2 = User(
-            username="khalid",
-            full_name="Khalid Al-Harthi",
+        mohammad = User(
+            username="mohammad",
+            full_name="Mohammad",
             role="employee",
         )
-        emp2.set_password("khalid123")
-        db.add(emp2)
-
-        emp3 = User(
-            username="said",
-            full_name="Said Al-Busaidi",
-            role="employee",
-        )
-        emp3.set_password("said123")
-        db.add(emp3)
+        mohammad.set_password("mohammad123")
+        db.add(mohammad)
 
         bakhtar = User(
             username="bakhtar",
@@ -237,8 +229,8 @@ def seed():
         print("    Transport: 188.200 OMR (13 petrol entries)")
         print("    Other: 1,189.400 OMR")
         print("  Owner login: admin / admin123")
-        print("  Employee logins: ahmed/ahmed123, khalid/khalid123, said/said123")
         print("  Owner login (Bakhtar): bakhtar/bakhtar123")
+        print("  Employee logins: reza/reza123, mohammad/mohammad123")
 
     except Exception as e:
         db.rollback()
@@ -246,16 +238,46 @@ def seed():
     finally:
         db.close()
 
-    # Ensure Bakhtar has owner role (even if already seeded)
+    # Ensure correct user setup on existing database
     db2 = SessionLocal()
     try:
+        changed = False
+
+        # Ensure Bakhtar has owner role
         bakhtar_user = db2.query(User).filter(User.username == "bakhtar").first()
         if bakhtar_user and bakhtar_user.role != "owner":
             bakhtar_user.role = "owner"
-            db2.commit()
+            changed = True
             print("  Updated Bakhtar to owner role")
+
+        # Deactivate old employees
+        for username in ["ahmed", "khalid", "said"]:
+            old_user = db2.query(User).filter(User.username == username).first()
+            if old_user and old_user.is_active:
+                old_user.is_active = False
+                changed = True
+                print(f"  Deactivated {old_user.full_name}")
+
+        # Create Reza if not exists
+        if not db2.query(User).filter(User.username == "reza").first():
+            reza = User(username="reza", full_name="Reza", role="employee")
+            reza.set_password("reza123")
+            db2.add(reza)
+            changed = True
+            print("  Created employee: Reza")
+
+        # Create Mohammad if not exists
+        if not db2.query(User).filter(User.username == "mohammad").first():
+            mohammad = User(username="mohammad", full_name="Mohammad", role="employee")
+            mohammad.set_password("mohammad123")
+            db2.add(mohammad)
+            changed = True
+            print("  Created employee: Mohammad")
+
+        if changed:
+            db2.commit()
     except Exception as e:
         db2.rollback()
-        print(f"Bakhtar role update error: {e}")
+        print(f"User migration error: {e}")
     finally:
         db2.close()
