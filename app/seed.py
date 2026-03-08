@@ -48,7 +48,7 @@ def seed():
         bakhtar = User(
             username="bakhtar",
             full_name="Bakhtar",
-            role="employee",
+            role="owner",
         )
         bakhtar.set_password("bakhtar123")
         db.add(bakhtar)
@@ -238,9 +238,24 @@ def seed():
         print("    Other: 1,189.400 OMR")
         print("  Owner login: admin / admin123")
         print("  Employee logins: ahmed/ahmed123, khalid/khalid123, said/said123")
+        print("  Owner login (Bakhtar): bakhtar/bakhtar123")
 
     except Exception as e:
         db.rollback()
         print(f"Seed error: {e}")
     finally:
         db.close()
+
+    # Ensure Bakhtar has owner role (even if already seeded)
+    db2 = SessionLocal()
+    try:
+        bakhtar_user = db2.query(User).filter(User.username == "bakhtar").first()
+        if bakhtar_user and bakhtar_user.role != "owner":
+            bakhtar_user.role = "owner"
+            db2.commit()
+            print("  Updated Bakhtar to owner role")
+    except Exception as e:
+        db2.rollback()
+        print(f"Bakhtar role update error: {e}")
+    finally:
+        db2.close()
