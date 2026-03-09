@@ -166,6 +166,7 @@ function navigate(page) {
 
     const titles = {
         dashboard: 'Dashboard',
+        pos: 'Point of Sale',
         sales: 'Sales',
         expenses: 'Expenses',
         inventory: 'Inventory',
@@ -185,6 +186,7 @@ function navigate(page) {
     // Load page
     const loaders = {
         dashboard: loadDashboard,
+        pos: loadPOS,
         sales: loadSales,
         expenses: loadExpenses,
         inventory: loadInventory,
@@ -413,6 +415,242 @@ function renderDashboard(data, charts, moneySummary) {
             scales: { y: { beginAtZero: false } },
         }
     });
+}
+
+// ── Point of Sale ───────────────────────────────────────────────────────────
+
+let posCart = [];
+
+async function loadPOS() {
+    const content = document.getElementById('page-content');
+    posCart = [];
+
+    content.innerHTML = `
+        <div class="pos-layout">
+            <div class="pos-items-panel">
+                <div class="pos-search-bar">
+                    <input type="text" id="pos-search" placeholder="Search items..." oninput="fetchPOSItems()">
+                    <select id="pos-cat-filter" onchange="fetchPOSItems()">
+                        <option value="">All</option>
+                        <option value="sofa">Sofa</option>
+                        <option value="chair">Chair</option>
+                        <option value="table">Table</option>
+                        <option value="bed">Bed</option>
+                        <option value="curtain">Curtain</option>
+                        <option value="carpet">Carpet</option>
+                        <option value="accessory">Accessory</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div id="pos-items-grid" class="pos-items-grid">
+                    <div class="loading-center"><div class="spinner"></div></div>
+                </div>
+            </div>
+            <div class="pos-cart-panel">
+                <div class="pos-cart-header">
+                    <h3>Cart</h3>
+                    <button class="btn btn-sm btn-outline" onclick="posClearCart()">Clear</button>
+                </div>
+                <div id="pos-cart-items" class="pos-cart-items">
+                    <div class="pos-cart-empty">No items in cart</div>
+                </div>
+                <div class="pos-cart-summary">
+                    <div class="pos-summary-row">
+                        <span>Subtotal</span>
+                        <span id="pos-subtotal">0.000 OMR</span>
+                    </div>
+                    <div class="pos-summary-row pos-discount-row">
+                        <span>Discount</span>
+                        <input type="number" id="pos-discount" value="0" min="0" step="0.001" placeholder="0.000" oninput="posUpdateTotals()">
+                    </div>
+                    <div class="pos-summary-row pos-total-row">
+                        <span>Total</span>
+                        <span id="pos-total">0.000 OMR</span>
+                    </div>
+                </div>
+                <div class="pos-checkout-section">
+                    <div class="form-group" style="margin-bottom:8px">
+                        <input type="text" id="pos-customer" placeholder="Customer name (optional)">
+                    </div>
+                    <div class="pos-payment-methods">
+                        <label class="pos-payment-option selected" onclick="posSelectPayment(this, 'cash')">
+                            <input type="radio" name="pos-payment" value="cash" checked hidden>
+                            <span>Cash</span>
+                        </label>
+                        <label class="pos-payment-option" onclick="posSelectPayment(this, 'bank')">
+                            <input type="radio" name="pos-payment" value="bank" hidden>
+                            <span>Bank</span>
+                        </label>
+                        <label class="pos-payment-option" onclick="posSelectPayment(this, 'transfer')">
+                            <input type="radio" name="pos-payment" value="transfer" hidden>
+                            <span>Transfer</span>
+                        </label>
+                    </div>
+                    <div class="form-group" style="margin-bottom:8px">
+                        <input type="text" id="pos-note" placeholder="Note (optional)">
+                    </div>
+                    <button class="btn btn-success btn-full pos-checkout-btn" onclick="posCheckout()" id="pos-checkout-btn">
+                        Complete Sale
+                    </button>
+                </div>
+            </div>
+        </div>`;
+
+    fetchPOSItems();
+}
+
+async function fetchPOSItems() {
+    const params = new URLSearchParams();
+    const search = document.getElementById('pos-search')?.value;
+    const cat = document.getElementById('pos-cat-filter')?.value;
+    if (search) params.set('search', search);
+    if (cat) params.set('category', cat);
+
+    try {
+        const items = await api('/api/pos/available-items?' + params);
+        renderPOSItems(items);
+    } catch (err) {
+        document.getElementById('pos-items-grid').innerHTML = '<div class="error-msg">' + esc(err.message) + '</div>';
+    }
+}
+
+function renderPOSItems(items) {
+    const grid = document.getElementById('pos-items-grid');
+    if (items.length === 0) {
+        grid.innerHTML = '<div class="pos-no-items"><p>No available items</p></div>';
+        return;
+    }
+
+    grid.innerHTML = items.map(function(i) {
+        var inCart = posCart.find(function(c) { return c.id === i.id; });
+        var dimmed = inCart && inCart.qty >= i.quantity ? ' pos-item-dimmed' : '';
+        return '<div class="pos-item-card' + dimmed + '" onclick="posAddToCart(' + i.id + ', \'' + esc(i.name).replace(/'/g, "\\'") + '\', ' + i.selling_price + ', ' + i.quantity + ')">' +
+            '<div class="pos-item-cat">' + esc(i.category) + '</div>' +
+            '<div class="pos-item-name">' + esc(i.name) + '</div>' +
+            (i.description ? '<div class="pos-item-desc">' + esc(i.description) + '</div>' : '') +
+            '<div class="pos-item-price">' + formatOMR(i.selling_price) + '</div>' +
+            '<div class="pos-item-stock">In stock: ' + i.quantity + '</div>' +
+        '</div>';
+    }).join('');
+}
+
+function posAddToCart(id, name, price, maxQty) {
+    var existing = posCart.find(function(c) { return c.id === id; });
+    if (existing) {
+        if (existing.qty >= maxQty) {
+            toast('Maximum stock reached for ' + name, 'error');
+            return;
+        }
+        existing.qty++;
+    } else {
+        posCart.push({ id: id, name: name, price: parseFloat(price), qty: 1, maxQty: maxQty });
+    }
+    posRenderCart();
+    posUpdateTotals();
+    // Refresh item grid to show dimmed state
+    fetchPOSItems();
+}
+
+function posRemoveFromCart(id) {
+    posCart = posCart.filter(function(c) { return c.id !== id; });
+    posRenderCart();
+    posUpdateTotals();
+    fetchPOSItems();
+}
+
+function posUpdateQty(id, delta) {
+    var item = posCart.find(function(c) { return c.id === id; });
+    if (!item) return;
+    item.qty += delta;
+    if (item.qty <= 0) {
+        posRemoveFromCart(id);
+        return;
+    }
+    if (item.qty > item.maxQty) {
+        item.qty = item.maxQty;
+        toast('Maximum stock reached', 'error');
+    }
+    posRenderCart();
+    posUpdateTotals();
+    fetchPOSItems();
+}
+
+function posClearCart() {
+    posCart = [];
+    posRenderCart();
+    posUpdateTotals();
+    fetchPOSItems();
+}
+
+function posRenderCart() {
+    var container = document.getElementById('pos-cart-items');
+    if (posCart.length === 0) {
+        container.innerHTML = '<div class="pos-cart-empty">No items in cart</div>';
+        return;
+    }
+
+    container.innerHTML = posCart.map(function(c) {
+        return '<div class="pos-cart-item">' +
+            '<div class="pos-cart-item-info">' +
+                '<div class="pos-cart-item-name">' + esc(c.name) + '</div>' +
+                '<div class="pos-cart-item-price">' + formatOMR(c.price) + ' each</div>' +
+            '</div>' +
+            '<div class="pos-cart-item-controls">' +
+                '<button class="pos-qty-btn" onclick="posUpdateQty(' + c.id + ', -1)">-</button>' +
+                '<span class="pos-qty-display">' + c.qty + '</span>' +
+                '<button class="pos-qty-btn" onclick="posUpdateQty(' + c.id + ', 1)">+</button>' +
+            '</div>' +
+            '<div class="pos-cart-item-total">' + formatOMR(c.price * c.qty) + '</div>' +
+            '<button class="pos-cart-remove" onclick="posRemoveFromCart(' + c.id + ')">&times;</button>' +
+        '</div>';
+    }).join('');
+}
+
+function posUpdateTotals() {
+    var subtotal = posCart.reduce(function(sum, c) { return sum + c.price * c.qty; }, 0);
+    var discount = parseFloat(document.getElementById('pos-discount')?.value || 0);
+    if (isNaN(discount) || discount < 0) discount = 0;
+    var total = Math.max(0, subtotal - discount);
+
+    document.getElementById('pos-subtotal').textContent = formatOMR(subtotal);
+    document.getElementById('pos-total').textContent = formatOMR(total);
+}
+
+function posSelectPayment(el, method) {
+    document.querySelectorAll('.pos-payment-option').forEach(function(o) { o.classList.remove('selected'); });
+    el.classList.add('selected');
+    el.querySelector('input').checked = true;
+}
+
+async function posCheckout() {
+    if (posCart.length === 0) {
+        toast('Add items to cart first', 'error');
+        return;
+    }
+
+    var btn = document.getElementById('pos-checkout-btn');
+    btn.disabled = true;
+    btn.textContent = 'Processing...';
+
+    var paymentEl = document.querySelector('input[name="pos-payment"]:checked');
+    var data = {
+        items: posCart.map(function(c) { return { id: c.id, qty: c.qty }; }),
+        customer_name: document.getElementById('pos-customer')?.value || '',
+        payment_method: paymentEl ? paymentEl.value : 'cash',
+        discount: document.getElementById('pos-discount')?.value || '0',
+        note: document.getElementById('pos-note')?.value || '',
+    };
+
+    try {
+        var result = await api('/api/pos/checkout', { method: 'POST', body: data });
+        toast(result.message + ' Total: ' + formatOMR(result.total));
+        posCart = [];
+        loadPOS();
+    } catch (err) {
+        toast(err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Complete Sale';
+    }
 }
 
 // ── Sales Page ──────────────────────────────────────────────────────────────
