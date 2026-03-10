@@ -1,15 +1,19 @@
+databases:
+  - name: furniture-db
+    plan: free
+    databaseName: furniture_erp
+    user: furniture_user
+
 services:
   - type: web
     name: Furniture-erp
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    disk:
-      name: furniture-data
-      mountPath: /data
-      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.7
-      - key: DATA_DIR
-        value: /data
+      - key: DATABASE_URL
+        fromDatabase:
+          name: furniture-db
+          property: connectionString

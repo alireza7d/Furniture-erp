@@ -2,22 +2,21 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-# Use /data directory on Railway for persistent storage, fallback to local
-# Railway: set DATA_DIR=/data and attach a persistent volume at /data
-data_dir = os.environ.get("DATA_DIR", "")
-if not data_dir:
-    # Auto-detect persistent volume on Railway/Render
-    if os.path.isdir("/data"):
-        data_dir = "/data"
-    else:
-        data_dir = "."
+# Use DATABASE_URL from environment (Render PostgreSQL), fallback to SQLite for local dev
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
-# Ensure directory exists
-os.makedirs(data_dir, exist_ok=True)
+if DATABASE_URL:
+    # Render provides postgres:// but SQLAlchemy 2.x needs postgresql://
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+else:
+    # Local development: use SQLite
+    data_dir = os.environ.get("DATA_DIR", ".")
+    os.makedirs(data_dir, exist_ok=True)
+    DATABASE_URL = f"sqlite:///{data_dir}/furniture_erp.db"
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
-DATABASE_URL = f"sqlite:///{data_dir}/furniture_erp.db"
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
