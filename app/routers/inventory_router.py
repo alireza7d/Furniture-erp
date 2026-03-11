@@ -18,6 +18,8 @@ ITEM_CATEGORIES = [
     {"value": "bed", "label": "Bed"},
     {"value": "curtain", "label": "Curtain"},
     {"value": "carpet", "label": "Carpet"},
+    {"value": "rug", "label": "Rug"},
+    {"value": "frame", "label": "Frame"},
     {"value": "accessory", "label": "Accessory"},
     {"value": "other", "label": "Other"},
 ]
