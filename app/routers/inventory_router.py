@@ -20,6 +20,9 @@ ITEM_CATEGORIES = [
     {"value": "carpet", "label": "Carpet"},
     {"value": "rug", "label": "Rug"},
     {"value": "frame", "label": "Frame"},
+    {"value": "flower_pot", "label": "Flower Pot"},
+    {"value": "glass", "label": "Glass"},
+    {"value": "silk_rug", "label": "Silk Rug"},
     {"value": "accessory", "label": "Accessory"},
     {"value": "other", "label": "Other"},
 ]
